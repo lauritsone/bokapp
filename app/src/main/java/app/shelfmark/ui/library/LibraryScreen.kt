@@ -1,5 +1,8 @@
 package app.shelfmark.ui.library
 
+import app.shelfmark.data.ImportException
+import androidx.compose.material.icons.rounded.FileUpload
+import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import app.shelfmark.ui.components.icon
 import app.shelfmark.ui.components.colors
 import app.shelfmark.ui.components.ShelfBadge
@@ -109,6 +112,7 @@ fun LibraryScreen(
     val query by vm.query.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val export = rememberExporter(repo, snackbar)
+    val import = rememberImporter(repo, snackbar)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -135,7 +139,7 @@ fun LibraryScreen(
             ),
         ) {
             item(key = "header") {
-                LibraryHeader(state, onAddByHand = { onAddByHand(state.shelf) }, onExport = export)
+                LibraryHeader(state, onAddByHand = { onAddByHand(state.shelf) }, onExport = export, onImport = import)
             }
             if (state.totalCount > 0) {
                 item(key = "shelves") {
@@ -160,7 +164,11 @@ fun LibraryScreen(
             when {
                 !state.loaded -> Unit
                 state.totalCount == 0 -> item(key = "empty") {
-                    EmptyLibrary(onScan = { onScan(Shelf.Read) }, onAddByHand = { onAddByHand(Shelf.Read) })
+                    EmptyLibrary(
+                        onScan = { onScan(Shelf.Read) },
+                        onAddByHand = { onAddByHand(Shelf.Read) },
+                        onImport = import,
+                    )
                 }
                 state.books.isEmpty() && query.isBlank() -> item(key = "emptyShelf") { EmptyShelf(state.shelf) }
                 state.books.isEmpty() -> item(key = "none") { NoResults(query) }
@@ -179,7 +187,12 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryHeader(state: LibraryState, onAddByHand: () -> Unit, onExport: (ExportFormat) -> Unit) {
+private fun LibraryHeader(
+    state: LibraryState,
+    onAddByHand: () -> Unit,
+    onExport: (ExportFormat) -> Unit,
+    onImport: () -> Unit,
+) {
     Row(verticalAlignment = Alignment.Top) {
         Column(Modifier.weight(1f)) {
             Text(
@@ -196,7 +209,7 @@ private fun LibraryHeader(state: LibraryState, onAddByHand: () -> Unit, onExport
                 )
             }
         }
-        LibraryMenu(canExport = state.totalCount > 0, onExport = onExport, modifier = Modifier.padding(top = 2.dp))
+        LibraryMenu(canExport = state.totalCount > 0, onExport = onExport, onImport = onImport, modifier = Modifier.padding(top = 2.dp))
         if (state.totalCount > 0) {
             Spacer(Modifier.width(8.dp))
             FilledTonalIconButton(onClick = onAddByHand, modifier = Modifier.padding(top = 2.dp)) {
@@ -317,7 +330,7 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EmptyLibrary(onScan: () -> Unit, onAddByHand: () -> Unit) {
+private fun EmptyLibrary(onScan: () -> Unit, onAddByHand: () -> Unit, onImport: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -352,6 +365,9 @@ private fun EmptyLibrary(onScan: () -> Unit, onAddByHand: () -> Unit) {
         TextButton(onClick = onAddByHand) {
             Text(stringResource(R.string.add_by_hand), style = MaterialTheme.typography.labelLarge)
         }
+        TextButton(onClick = onImport) {
+            Text(stringResource(R.string.import_from_backup), style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 
@@ -385,9 +401,14 @@ private fun StackOfBooks() {
     }
 }
 
-/** Export and language, behind the ⋮ button. */
+/** Import, export and language, behind the ⋮ button. */
 @Composable
-private fun LibraryMenu(canExport: Boolean, onExport: (ExportFormat) -> Unit, modifier: Modifier = Modifier) {
+private fun LibraryMenu(
+    canExport: Boolean,
+    onExport: (ExportFormat) -> Unit,
+    onImport: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         IconButton(onClick = { open = true }) {
@@ -413,8 +434,16 @@ private fun LibraryMenu(canExport: Boolean, onExport: (ExportFormat) -> Unit, mo
                         },
                     )
                 }
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
             }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.import_books)) },
+                leadingIcon = { Icon(Icons.Rounded.FileUpload, contentDescription = null) },
+                onClick = {
+                    open = false
+                    onImport()
+                },
+            )
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
             LanguageMenuItems(onChosen = { open = false })
         }
     }
@@ -451,6 +480,46 @@ private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState):
         val launcher = if (format == ExportFormat.Csv) csv else json
         launcher.launch(LibraryExport.fileName(format))
     }
+}
+
+/** File types offered in the picker; the file's contents decide how it is read. */
+private val ImportMimeTypes = arrayOf(
+    "application/json", "text/csv", "text/comma-separated-values", "text/plain",
+    "application/vnd.ms-excel", "application/octet-stream",
+)
+
+/**
+ * Lets the user pick a JSON backup or CSV file, adds its books, and reports the
+ * result in [snackbar]. Returns the function to start an import.
+ */
+@Composable
+private fun rememberImporter(repo: BookRepository, snackbar: SnackbarHostState): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val launcher = rememberLauncherForActivityResult(OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val res = context.resources
+            val message = try {
+                val input = context.contentResolver.openInputStream(uri) ?: throw IOException("No input stream")
+                val result = repo.import(input)
+                when {
+                    result.added == 0 && result.skipped == 0 -> res.getString(R.string.import_nothing)
+                    result.skipped == 0 -> res.getQuantityString(R.plurals.import_done, result.added, result.added)
+                    else -> res.getQuantityString(R.plurals.import_done, result.added, result.added) + " " +
+                        res.getQuantityString(R.plurals.import_skipped, result.skipped, result.skipped)
+                }
+            } catch (e: ImportException) {
+                res.getString(R.string.import_failed)
+            } catch (e: IOException) {
+                res.getString(R.string.import_failed)
+            } catch (e: SecurityException) {
+                res.getString(R.string.import_failed)
+            }
+            snackbar.showSnackbar(message, withDismissAction = true)
+        }
+    }
+    return { launcher.launch(ImportMimeTypes) }
 }
 
 /** One tab per shelf, each with its icon, colour and number of books. */

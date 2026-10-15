@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InputStream
 import java.io.OutputStream
 
 class BookRepository(
@@ -43,6 +44,31 @@ class BookRepository(
         books.size
     }
 
+    /**
+     * Adds the books in a JSON backup or CSV file. Books already in the library (same
+     * ISBN, or same title and author) are skipped, so importing twice is harmless.
+     * @throws ImportException if the file can't be read as either format.
+     */
+    suspend fun import(input: InputStream): ImportResult = withContext(Dispatchers.IO) {
+        val text = input.use { it.readBytes().toString(Charsets.UTF_8) }
+        val incoming = LibraryImport.parse(text)
+        val existing = dao.getAll()
+        val seenIsbns = existing.mapNotNull { it.isbn }.toMutableSet()
+        val seenNames = existing.map(::nameKey).toMutableSet()
+        val fresh = incoming.filter { book ->
+            val duplicate = (book.isbn != null && book.isbn in seenIsbns) || nameKey(book) in seenNames
+            if (!duplicate) {
+                book.isbn?.let(seenIsbns::add)
+                seenNames.add(nameKey(book))
+            }
+            !duplicate
+        }
+        dao.insertAll(fresh)
+        ImportResult(added = fresh.size, skipped = incoming.size - fresh.size)
+    }
+
+    private fun nameKey(book: Book) = foldText(book.title) + "|" + foldText(book.authors)
+
     suspend fun delete(book: Book) {
         dao.delete(book)
         book.photoPath?.let { path -> withContext(Dispatchers.IO) { File(path).delete() } }
@@ -54,3 +80,5 @@ class BookRepository(
         return File(dir, "cover_${System.currentTimeMillis()}.jpg")
     }
 }
+
+data class ImportResult(val added: Int, val skipped: Int)

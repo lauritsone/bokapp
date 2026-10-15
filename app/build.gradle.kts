@@ -74,6 +74,8 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     testImplementation("junit:junit:4.13.2")
+    // The real org.json, since Android's is only a stub in local unit tests.
+    testImplementation("org.json:json:20240303")
 
     // Cover images
     implementation("io.coil-kt:coil-compose:2.7.0")

@@ -121,4 +121,18 @@
         <item quantity="other">Eksporterte %1$d bøker</item>
     </plurals>
     <string name="export_failed">Kunne ikke lagre filen. Prøv igjen.</string>
+
+    <!-- Import -->
+    <string name="import_books">Importer bøker (JSON eller CSV)</string>
+    <string name="import_from_backup">Importer fra en sikkerhetskopi</string>
+    <plurals name="import_done">
+        <item quantity="one">Importerte %1$d bok.</item>
+        <item quantity="other">Importerte %1$d bøker.</item>
+    </plurals>
+    <plurals name="import_skipped">
+        <item quantity="one">%1$d fantes allerede i biblioteket og ble hoppet over.</item>
+        <item quantity="other">%1$d fantes allerede i biblioteket og ble hoppet over.</item>
+    </plurals>
+    <string name="import_nothing">Fant ingen bøker i filen.</string>
+    <string name="import_failed">Kunne ikke lese filen. Velg en sikkerhetskopi fra Shelfmark (JSON) eller en CSV-fil med en tittelkolonne.</string>
 </resources>

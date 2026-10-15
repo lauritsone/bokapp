@@ -2,6 +2,7 @@ package app.shelfmark.data
 
 import androidx.room.Dao
 import androidx.room.Delete
+import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,9 @@ interface BookDao {
 
     @Query("SELECT * FROM books WHERE isbn = :isbn LIMIT 1")
     suspend fun findByIsbn(isbn: String): Book?
+
+    @Insert
+    suspend fun insertAll(books: List<Book>)
 
     @Upsert
     suspend fun upsert(book: Book): Long

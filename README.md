@@ -14,6 +14,7 @@ Everything is stored on the phone.
 - **Library**: search by title, author, ISBN or notes. Sort by recently added, highest rated, title or author.
 - **Shelves**: keep books under *Read*, *Reading* or *Want to read*. Switch shelves in the library; a book scanned from a shelf lands on it, and you can move it from the book's page.
 - **Export**: save the whole library as a spreadsheet (CSV, opens in Excel or Google Sheets) or a JSON backup, to Downloads, Drive or anywhere else.
+- **Import**: add books from a Shelfmark JSON backup or a CSV file: Shelfmark's own export, a spreadsheet (comma or semicolon separated) with a title column, or a Goodreads library export. Books already in the library are skipped.
 - **English and Norwegian**: pick the language from the ⋮ menu, or follow the phone's language.
 - **Duplicate check**: scanning a book you've already logged takes you to its page.
 - Light and dark themes, edge-to-edge layout and TalkBack labels on all controls.
@@ -63,6 +64,6 @@ Kotlin 2.0, Jetpack Compose with Material 3, Room, CameraX 1.4, ML Kit Barcode S
 
 ## Ideas for next steps
 
-- Import a JSON backup
+- **New releases with a match score**: a page listing publishers' new books, each with a match percentage based on what you have read and how you rated it
 - A finished date and a yearly reading goal
 - Google Books API key in `BookLookup` if you hit the anonymous quota

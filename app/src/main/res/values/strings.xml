@@ -126,4 +126,18 @@
         <item quantity="other">Exported %1$d books</item>
     </plurals>
     <string name="export_failed">Couldn\'t save the file. Try again.</string>
+
+    <!-- Import -->
+    <string name="import_books">Import books (JSON or CSV)</string>
+    <string name="import_from_backup">Import from a backup</string>
+    <plurals name="import_done">
+        <item quantity="one">Imported %1$d book.</item>
+        <item quantity="other">Imported %1$d books.</item>
+    </plurals>
+    <plurals name="import_skipped">
+        <item quantity="one">%1$d was already in your library and was skipped.</item>
+        <item quantity="other">%1$d were already in your library and were skipped.</item>
+    </plurals>
+    <string name="import_nothing">No books found in that file.</string>
+    <string name="import_failed">Couldn\'t read that file. Choose a Shelfmark backup (JSON) or a CSV file with a title column.</string>
 </resources>
