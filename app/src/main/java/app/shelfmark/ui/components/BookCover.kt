@@ -1,5 +1,10 @@
 package app.shelfmark.ui.components
 
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.remember
 import app.shelfmark.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
@@ -56,19 +61,20 @@ fun BookCover(
             .clip(CoverShape)
             .background(tone),
     ) {
-        val fontSize = (maxWidth.value / 7.5f).coerceIn(8f, 24f).sp
+        val text = title.ifBlank { stringResource(R.string.untitled) }
+        val textWidth = maxWidth * (1f - CoverStartPadding - CoverEndPadding)
+        val fontSize = rememberCoverFontSize(text, textWidth, baseSize = (maxWidth.value / 7.5f).coerceIn(8f, 24f))
         Text(
-            text = title.ifBlank { stringResource(R.string.untitled) },
+            text = text,
             color = Color.White.copy(alpha = 0.92f),
-            style = TextStyle(
-                fontFamily = Literata,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = fontSize,
-                lineHeight = fontSize * 1.18f,
-            ),
+            style = coverTitleStyle(fontSize).copy(hyphens = Hyphens.Auto),
             maxLines = 5,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = maxWidth * 0.14f, end = maxWidth * 0.08f, top = maxWidth * 0.12f),
+            modifier = Modifier.padding(
+                start = maxWidth * CoverStartPadding,
+                end = maxWidth * CoverEndPadding,
+                top = maxWidth * 0.12f,
+            ),
         )
         if (model != null) {
             AsyncImage(
@@ -89,5 +95,37 @@ fun BookCover(
                     ),
                 ),
         )
+    }
+}
+
+private const val CoverStartPadding = 0.14f
+private const val CoverEndPadding = 0.08f
+
+/** Smallest the title may shrink to, as a share of its normal size, before long words are hyphenated. */
+private const val MinFontScale = 0.65f
+
+private fun coverTitleStyle(fontSize: TextUnit) = TextStyle(
+    fontFamily = Literata,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = fontSize,
+    lineHeight = fontSize * 1.18f,
+)
+
+/**
+ * The title's font size, shrunk until its widest word fits on one line, so words like
+ * "Snømannen" aren't broken mid-word on a small cover. Past [MinFontScale] it stops
+ * shrinking and lets hyphenation break the word instead.
+ */
+@Composable
+private fun rememberCoverFontSize(text: String, width: Dp, baseSize: Float): TextUnit {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    return remember(text, width, baseSize, density) {
+        val available = with(density) { width.toPx() }
+        val widest = text.split(Regex("\\s+")).filter { it.isNotEmpty() }.maxOfOrNull { word ->
+            measurer.measure(word, coverTitleStyle(baseSize.sp), maxLines = 1, softWrap = false).size.width
+        } ?: 0
+        val scale = if (widest > available) (available / widest * 0.98f).coerceAtLeast(MinFontScale) else 1f
+        (baseSize * scale).sp
     }
 }
