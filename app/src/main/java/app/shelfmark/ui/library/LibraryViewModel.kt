@@ -30,6 +30,8 @@ data class LibraryState(
     /** Average over finished books only. */
     val averageRating: Double? = null,
     val shelf: Shelf = Shelf.Read,
+    /** True while a search is shown; results then come from every shelf. */
+    val searching: Boolean = false,
     val sort: SortMode = SortMode.Recent,
     val loaded: Boolean = false,
 )
@@ -41,13 +43,12 @@ class LibraryViewModel(repo: BookRepository) : ViewModel() {
     private val shelf = MutableStateFlow(Shelf.Read)
 
     val state: StateFlow<LibraryState> = combine(repo.books, _query, sort, shelf) { all, q, s, sh ->
-        val needle = q.trim()
-        val onShelf = all.filter { it.shelf == sh }
-        val filtered = if (needle.isEmpty()) onShelf else onShelf.filter {
-            it.title.contains(needle, ignoreCase = true) ||
-                it.authors.contains(needle, ignoreCase = true) ||
-                it.notes.contains(needle, ignoreCase = true) ||
-                it.isbn?.contains(needle) == true
+        // A search looks through every shelf; otherwise show the selected shelf.
+        val terms = SearchMatcher.terms(q)
+        val filtered = if (terms.isEmpty()) {
+            all.filter { it.shelf == sh }
+        } else {
+            all.filter { SearchMatcher.matches(it, terms) }
         }
         val sorted = when (s) {
             SortMode.Recent -> filtered.sortedByDescending { it.addedAt }
@@ -64,6 +65,7 @@ class LibraryViewModel(repo: BookRepository) : ViewModel() {
             shelfCounts = all.groupingBy { it.shelf }.eachCount(),
             averageRating = if (rated.isEmpty()) null else rated.map { it.rating }.average(),
             shelf = sh,
+            searching = terms.isNotEmpty(),
             sort = s,
             loaded = true,
         )

@@ -139,7 +139,16 @@ fun LibraryScreen(
             }
             if (state.totalCount > 0) {
                 item(key = "shelves") {
-                    ShelfTabs(state, vm::setShelf, Modifier.padding(top = 20.dp))
+                    if (state.searching) {
+                        Text(
+                            stringResource(R.string.searching_all_shelves),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 20.dp),
+                        )
+                    } else {
+                        ShelfTabs(state, vm::setShelf, Modifier.padding(top = 20.dp))
+                    }
                 }
                 item(key = "search") {
                     SearchField(query, vm::setQuery, Modifier.padding(top = 12.dp))

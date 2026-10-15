@@ -42,6 +42,7 @@
     <string name="add_by_hand">Add a book by hand</string>
     <string name="search_placeholder">Search titles, authors or notes</string>
     <string name="clear_search">Clear search</string>
+    <string name="searching_all_shelves">Searching all shelves</string>
     <string name="sort_recent">Recently added</string>
     <string name="sort_rating">Highest rated</string>
     <string name="sort_title">Title</string>

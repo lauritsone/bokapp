@@ -37,6 +37,7 @@
     <string name="add_by_hand">Legg til en bok manuelt</string>
     <string name="search_placeholder">Søk i titler, forfattere eller notater</string>
     <string name="clear_search">Tøm søket</string>
+    <string name="searching_all_shelves">Søker i alle hyllene</string>
     <string name="sort_recent">Nylig lagt til</string>
     <string name="sort_rating">Best vurdert</string>
     <string name="sort_title">Tittel</string>
