@@ -23,7 +23,8 @@ data class BookInfo(
 
 /**
  * Looks up a book by ISBN. Tries Google Books first (best coverage + descriptions),
- * then falls back to Open Library. Neither needs an API key.
+ * then Open Library, then the Norwegian (NB.no) and Swedish (Libris) national library
+ * catalogues, which cover Nordic books the others often miss. None needs an API key.
  */
 class BookLookup {
 
@@ -33,7 +34,7 @@ class BookLookup {
      */
     suspend fun lookup(isbn: String): BookInfo? = withContext(Dispatchers.IO) {
         var reachedASource = false
-        val sources: List<(String) -> BookInfo?> = listOf(::fromGoogleBooks, ::fromOpenLibrary)
+        val sources: List<(String) -> BookInfo?> = listOf(::fromGoogleBooks, ::fromOpenLibrary, ::fromNationalLibraryNorway, ::fromLibris)
         for (source in sources) {
             try {
                 val info = source(isbn)
@@ -96,6 +97,50 @@ class BookLookup {
         )
     }
 
+    private fun fromNationalLibraryNorway(isbn: String): BookInfo? {
+        val root = JSONObject(httpGet("https://api.nb.no/catalog/v1/items?q=isbn:$isbn&size=5"))
+        val items = root.optJSONObject("_embedded")?.optJSONArray("items") ?: return null
+        val item = (0 until items.length()).map { items.getJSONObject(it) }.firstOrNull { item ->
+            val isbns = item.optJSONObject("metadata")?.optJSONObject("identifiers")?.optJSONArray("isbn13")
+            isbns != null && (0 until isbns.length()).any { isbns.optString(it) == isbn }
+        } ?: return null
+        val data = item.getJSONObject("metadata")
+        val title = data.str("title") ?: return null
+        val origin = data.optJSONObject("originInfo")
+        return BookInfo(
+            isbn = isbn,
+            title = title,
+            authors = data.optJSONArray("creators").names().joinToString(", ") { invertName(it) },
+            publisher = origin?.str("publisher"),
+            publishedDate = origin?.str("issued"),
+            pageCount = data.optInt("pageCount").takeIf { it > 0 },
+            description = null,
+            coverUrl = item.optJSONObject("_links")?.optJSONObject("thumbnail_large")?.str("href"),
+        )
+    }
+
+    private fun fromLibris(isbn: String): BookInfo? {
+        val root = JSONObject(httpGet("https://libris.kb.se/xsearch?query=isbn:$isbn&format=json"))
+        val list = root.optJSONObject("xsearch")?.optJSONArray("list") ?: return null
+        val data = (0 until list.length()).map { list.getJSONObject(it) }.firstOrNull { record ->
+            record.stringList("isbn").any { Isbn.normalize(it) == isbn }
+        } ?: return null
+        val title = data.str("title") ?: return null
+        return BookInfo(
+            isbn = isbn,
+            title = title,
+            authors = data.stringList("creator").joinToString(", ") { invertName(it) },
+            // Entries look like "Stockholm : Rabén & Sjögren"; keep the publisher's name.
+            publisher = data.stringList("publisher")
+                .map { it.substringAfter(" : ").trim(' ', ';', ':') }
+                .firstOrNull { it.isNotBlank() },
+            publishedDate = data.str("date"),
+            pageCount = null,
+            description = null,
+            coverUrl = null,
+        )
+    }
+
     private fun openLibraryCover(isbn: String) =
         "https://covers.openlibrary.org/b/isbn/$isbn-L.jpg?default=false"
 
@@ -119,6 +164,20 @@ class BookLookup {
 
 private fun JSONObject.str(key: String): String? =
     if (isNull(key)) null else optString(key).trim().ifBlank { null }
+
+/** A field that may hold a single string or an array of strings. */
+private fun JSONObject.stringList(key: String): List<String> =
+    optJSONArray(key)?.names() ?: listOfNotNull(str(key))
+
+private fun JSONArray?.names(): List<String> =
+    if (this == null) emptyList() else (0 until length()).mapNotNull { optString(it).trim().ifBlank { null } }
+
+/** Library catalogues write "Nesbø, Jo" or "Lindgren, Astrid, 1907-2002"; shows "Jo Nesbø". */
+private fun invertName(name: String): String {
+    val parts = name.split(",").map { it.trim() }
+    if (parts.size < 2 || parts[1].isEmpty() || parts[1].first().isDigit()) return parts[0]
+    return "${parts[1]} ${parts[0]}"
+}
 
 /** Joins a JSON array of strings, or of objects (using [key]), into "A, B". */
 private fun JSONArray?.joinValues(key: String? = null): String {
