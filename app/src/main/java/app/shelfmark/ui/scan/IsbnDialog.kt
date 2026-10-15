@@ -1,5 +1,7 @@
 package app.shelfmark.ui.scan
 
+import app.shelfmark.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,11 +33,11 @@ fun IsbnDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Type the ISBN", style = MaterialTheme.typography.headlineSmall) },
+        title = { Text(stringResource(R.string.type_isbn_title), style = MaterialTheme.typography.headlineSmall) },
         text = {
             Column {
                 Text(
-                    "It's the 10 or 13 digits printed above the barcode, or on the copyright page.",
+                    stringResource(R.string.type_isbn_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(16.dp))
@@ -44,10 +46,10 @@ fun IsbnDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
                     onValueChange = { v -> text = v.filter { it.isDigit() || it in "xX- " }.take(17) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("ISBN") },
+                    label = { Text(stringResource(R.string.isbn)) },
                     isError = showError,
                     supportingText = {
-                        if (showError) Text("Check the digits. This isn't a valid ISBN.")
+                        if (showError) Text(stringResource(R.string.isbn_invalid))
                     },
                     textStyle = MaterialTheme.typography.bodyLarge,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
@@ -56,10 +58,10 @@ fun IsbnDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = { isbn?.let(onSubmit) }, enabled = isbn != null) { Text("Look up book") }
+            TextButton(onClick = { isbn?.let(onSubmit) }, enabled = isbn != null) { Text(stringResource(R.string.look_up_book)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

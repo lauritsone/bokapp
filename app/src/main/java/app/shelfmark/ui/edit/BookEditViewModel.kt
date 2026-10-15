@@ -12,10 +12,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
 
+/** Notices shown above the form; turned into text by the screen. */
+sealed interface EditMessage {
+    data object InvalidIsbn : EditMessage
+    data object Offline : EditMessage
+    data class NotFound(val isbn: String) : EditMessage
+}
+
 data class EditState(
     val book: Book = Book(),
     val loading: Boolean = false,
-    val message: String? = null,
+    val message: EditMessage? = null,
     val duplicateOf: Long? = null,
     val saving: Boolean = false,
     val savedId: Long? = null,
@@ -47,7 +54,7 @@ class BookEditViewModel(
         val raw = _state.value.book.isbn.orEmpty()
         val isbn = Isbn.normalize(raw)
         if (isbn == null) {
-            _state.update { it.copy(message = "That ISBN doesn't check out. Look for 10 or 13 digits near the barcode.") }
+            _state.update { it.copy(message = EditMessage.InvalidIsbn) }
             return
         }
         viewModelScope.launch { fetch(isbn) }
@@ -68,7 +75,7 @@ class BookEditViewModel(
             _state.update {
                 it.copy(
                     loading = false,
-                    message = "No connection to the book database. Fill in the details below, or try the lookup again later.",
+                    message = EditMessage.Offline,
                 )
             }
             return
@@ -78,7 +85,7 @@ class BookEditViewModel(
             if (info == null) {
                 s.copy(
                     loading = false,
-                    message = "ISBN $isbn isn't in the online catalogues yet. Add the title and author below.",
+                    message = EditMessage.NotFound(isbn),
                 )
             } else {
                 s.copy(

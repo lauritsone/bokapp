@@ -2,9 +2,9 @@ package app.shelfmark
 
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -17,7 +17,8 @@ import app.shelfmark.ui.library.LibraryScreen
 import app.shelfmark.ui.scan.ScanScreen
 import app.shelfmark.ui.theme.ShelfmarkTheme
 
-class MainActivity : ComponentActivity() {
+// AppCompatActivity applies the in-app language choice on Android versions before 13.
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

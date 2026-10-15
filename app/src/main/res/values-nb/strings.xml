@@ -1,0 +1,104 @@
+<resources>
+    <!-- Shared -->
+    <string name="back">Tilbake</string>
+    <string name="cancel">Avbryt</string>
+    <string name="edit">Rediger</string>
+    <string name="untitled">Uten tittel</string>
+    <string name="your_notes">Notatene dine</string>
+    <string name="notes_placeholder">Hva satt igjen? En favorittsetning, hva du følte, hvem du ville gitt den til …</string>
+
+    <!-- Language -->
+    <string name="language">Språk</string>
+    <string name="language_system">Telefonens språk</string>
+
+    <!-- Rating -->
+    <string name="rating_none">Trykk på en stjerne for å gi karakter</string>
+    <string name="rating_1">Likte den ikke</string>
+    <string name="rating_2">Den var grei</string>
+    <string name="rating_3">Likte den</string>
+    <string name="rating_4">Likte den veldig godt</string>
+    <string name="rating_5">Elsket den</string>
+    <string name="rated_out_of_5">%1$d av 5 stjerner</string>
+    <string name="rate_out_of_5">Gi %1$d av 5 stjerner</string>
+    <plurals name="stars">
+        <item quantity="one">%1$d stjerne</item>
+        <item quantity="other">%1$d stjerner</item>
+    </plurals>
+
+    <!-- Library -->
+    <string name="your_library">Biblioteket ditt</string>
+    <plurals name="books_read">
+        <item quantity="one">%1$d bok lest</item>
+        <item quantity="other">%1$d bøker lest</item>
+    </plurals>
+    <string name="books_read_with_average">%1$s, i snitt %2$.1f stjerner</string>
+    <string name="scan_a_book">Skann en bok</string>
+    <string name="add_by_hand">Legg til en bok manuelt</string>
+    <string name="search_placeholder">Søk i titler, forfattere eller notater</string>
+    <string name="clear_search">Tøm søket</string>
+    <string name="sort_recent">Nylig lagt til</string>
+    <string name="sort_rating">Best vurdert</string>
+    <string name="sort_title">Tittel</string>
+    <string name="sort_author">Forfatter</string>
+    <string name="not_rated">Ikke vurdert ennå</string>
+    <string name="empty_title">Start leseloggen din</string>
+    <string name="empty_body">Skann strekkoden bak på en bok du har lest, eller ta bilde av omslaget. Gi den stjerner, skriv ned hva du syntes, så ligger den her når du vil huske den.</string>
+    <string name="scan_first_book">Skann din første bok</string>
+    <string name="no_results">Ingen treff på «%1$s»</string>
+    <string name="no_results_hint">Prøv en del av en tittel, et forfatternavn eller et ord fra notatene dine.</string>
+
+    <!-- Book page -->
+    <string name="edit_details">Rediger detaljer</string>
+    <string name="remove_from_library">Fjern fra biblioteket</string>
+    <string name="remove_title">Fjerne denne boken?</string>
+    <string name="remove_body">«%1$s» og karakteren og notatene dine blir slettet fra biblioteket.</string>
+    <string name="remove">Fjern</string>
+    <string name="keep_it">Behold den</string>
+    <string name="published">Utgitt</string>
+    <string name="publisher">Forlag</string>
+    <string name="pages">Sider</string>
+    <string name="added">Lagt til</string>
+    <string name="details">Detaljer</string>
+    <string name="save_notes">Lagre notater</string>
+    <string name="write_thoughts">Skriv ned tankene dine</string>
+    <string name="about_book">Om boken</string>
+    <string name="show_less">Vis mindre</string>
+    <string name="show_more">Vis mer</string>
+
+    <!-- Add / edit -->
+    <string name="new_book">Ny bok</string>
+    <string name="your_rating">Din karakter</string>
+    <string name="finding_isbn">Søker etter ISBN %1$s …</string>
+    <string name="title">Tittel</string>
+    <string name="author">Forfatter</string>
+    <string name="isbn_supporting">Søket fyller inn tittel, forfatter og omslag for deg</string>
+    <string name="look_up_isbn">Slå opp dette ISBN-nummeret</string>
+    <string name="save_to_library">Lagre i biblioteket</string>
+    <string name="save_changes">Lagre endringer</string>
+    <string name="add_title_hint">Legg inn en tittel for å lagre boken.</string>
+    <string name="msg_invalid_isbn">Det ISBN-nummeret stemmer ikke. Se etter 10 eller 13 sifre ved strekkoden.</string>
+    <string name="msg_offline">Får ikke kontakt med bokdatabasen. Fyll inn detaljene under, eller prøv å søke igjen senere.</string>
+    <string name="msg_not_found">ISBN %1$s finnes ikke i nettkatalogene ennå. Legg inn tittel og forfatter under.</string>
+    <string name="already_logged_title">Denne har du allerede logget</string>
+    <string name="already_logged_body">Boken ligger allerede i biblioteket ditt. Åpne den for å endre karakteren eller skrive mer i notatene.</string>
+    <string name="open_book">Åpne boken</string>
+    <string name="go_back">Gå tilbake</string>
+
+    <!-- Scanner -->
+    <string name="mode_barcode">Strekkode</string>
+    <string name="mode_cover">Omslagsbilde</string>
+    <string name="hint_barcode">Rett kameraet mot strekkoden bak på boken</string>
+    <string name="hint_cover">Få forsiden innenfor rammen</string>
+    <string name="type_isbn_short">Skriv ISBN</string>
+    <string name="photo_failed">Bildet ble ikke lagret. Hold telefonen stødig og prøv igjen.</string>
+    <string name="take_cover_photo">Ta bilde av omslaget</string>
+    <string name="camera_off_title">Kameraet er ikke tillatt</string>
+    <string name="camera_off_body">Shelfmark bruker kameraet til å lese strekkoden på en bok eller ta bilde av omslaget. Bildene blir på telefonen.</string>
+    <string name="allow_camera">Gi tilgang til kameraet</string>
+    <string name="open_settings">Åpne innstillinger</string>
+    <string name="type_isbn_instead">Skriv inn ISBN i stedet</string>
+    <string name="type_isbn_title">Skriv inn ISBN</string>
+    <string name="type_isbn_body">Det er de 10 eller 13 sifrene over strekkoden, eller på kolofonsiden.</string>
+    <string name="isbn_invalid">Sjekk sifrene. Dette er ikke et gyldig ISBN.</string>
+    <string name="look_up_book">Slå opp boken</string>
+</resources>

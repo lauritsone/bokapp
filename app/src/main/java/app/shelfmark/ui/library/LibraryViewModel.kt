@@ -1,5 +1,7 @@
 package app.shelfmark.ui.library
 
+import app.shelfmark.R
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.Book
@@ -11,11 +13,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
-enum class SortMode(val label: String) {
-    Recent("Recently added"),
-    Rating("Highest rated"),
-    Title("Title"),
-    Author("Author"),
+enum class SortMode(@StringRes val label: Int) {
+    Recent(R.string.sort_recent),
+    Rating(R.string.sort_rating),
+    Title(R.string.sort_title),
+    Author(R.string.sort_author),
 }
 
 data class LibraryState(

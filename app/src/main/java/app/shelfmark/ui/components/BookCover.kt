@@ -1,5 +1,7 @@
 package app.shelfmark.ui.components
 
+import app.shelfmark.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -56,7 +58,7 @@ fun BookCover(
     ) {
         val fontSize = (maxWidth.value / 7.5f).coerceIn(8f, 24f).sp
         Text(
-            text = title.ifBlank { "Untitled" },
+            text = title.ifBlank { stringResource(R.string.untitled) },
             color = Color.White.copy(alpha = 0.92f),
             style = TextStyle(
                 fontFamily = Literata,

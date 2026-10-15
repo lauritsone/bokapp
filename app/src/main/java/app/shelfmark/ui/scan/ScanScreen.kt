@@ -1,5 +1,8 @@
 package app.shelfmark.ui.scan
 
+import androidx.annotation.StringRes
+import app.shelfmark.R
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
@@ -93,9 +96,9 @@ import app.shelfmark.ui.theme.StarDark
 import java.util.concurrent.Executors
 import kotlin.math.min
 
-private enum class ScanMode(val label: String, val icon: ImageVector, val hint: String) {
-    Barcode("Barcode", Icons.Rounded.QrCodeScanner, "Point at the barcode on the back cover"),
-    Cover("Cover photo", Icons.Rounded.PhotoCamera, "Fit the front cover inside the frame"),
+private enum class ScanMode(@StringRes val label: Int, val icon: ImageVector, @StringRes val hint: Int) {
+    Barcode(R.string.mode_barcode, Icons.Rounded.QrCodeScanner, R.string.hint_barcode),
+    Cover(R.string.mode_cover, Icons.Rounded.PhotoCamera, R.string.hint_cover),
 }
 
 @Composable
@@ -150,13 +153,13 @@ fun ScanScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back), tint = Color.White)
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = { showIsbnDialog = true }) {
                 Icon(Icons.Rounded.Keyboard, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Type ISBN", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.type_isbn_short), color = Color.White, style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -182,7 +185,7 @@ private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit) {
 
     var mode by rememberSaveable { mutableStateOf(ScanMode.Barcode) }
     var capturing by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<Int?>(null) }
 
     val analyzer = remember {
         IsbnAnalyzer { isbn ->
@@ -245,7 +248,7 @@ private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit) {
 
                 override fun onError(exception: ImageCaptureException) {
                     capturing = false
-                    error = "The photo wasn't saved. Hold steady and try again."
+                    error = R.string.photo_failed
                 }
             },
         )
@@ -272,7 +275,7 @@ private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                error ?: mode.hint,
+                stringResource(error ?: mode.hint),
                 color = if (error != null) StarDark else Color.White,
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
@@ -343,7 +346,7 @@ private fun ShutterButton(capturing: Boolean, onClick: () -> Unit) {
             .padding(8.dp)
             .clip(CircleShape)
             .background(if (capturing) Color.White.copy(alpha = 0.5f) else Color.White)
-            .clickable(enabled = !capturing, onClickLabel = "Take cover photo", role = Role.Button, onClick = onClick),
+            .clickable(enabled = !capturing, onClickLabel = stringResource(R.string.take_cover_photo), role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (capturing) {
@@ -374,7 +377,7 @@ private fun ModeSwitch(mode: ScanMode, onChange: (ScanMode) -> Unit) {
             ) {
                 Icon(m.icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(m.label, color = fg, style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(m.label), color = fg, style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -392,14 +395,14 @@ private fun PermissionNeeded(onAllow: () -> Unit, onOpenSettings: () -> Unit, on
         Icon(Icons.Rounded.PhotoCamera, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
         Spacer(Modifier.height(20.dp))
         Text(
-            "Camera access is off",
+            stringResource(R.string.camera_off_title),
             color = Color.White,
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "Shelfmark uses the camera to read a book's barcode or photograph its cover. Photos stay on this phone.",
+            stringResource(R.string.camera_off_body),
             color = Color.White.copy(alpha = 0.8f),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
@@ -409,12 +412,12 @@ private fun PermissionNeeded(onAllow: () -> Unit, onOpenSettings: () -> Unit, on
         Button(
             onClick = onAllow,
             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-        ) { Text("Allow camera", style = MaterialTheme.typography.labelLarge) }
+        ) { Text(stringResource(R.string.allow_camera), style = MaterialTheme.typography.labelLarge) }
         TextButton(onClick = onOpenSettings) {
-            Text("Open settings", color = Color.White, style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.open_settings), color = Color.White, style = MaterialTheme.typography.labelLarge)
         }
         TextButton(onClick = onTypeIsbn) {
-            Text("Type the ISBN instead", color = Color.White, style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.type_isbn_instead), color = Color.White, style = MaterialTheme.typography.labelLarge)
         }
     }
 }

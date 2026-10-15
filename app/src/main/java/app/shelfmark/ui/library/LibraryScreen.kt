@@ -1,5 +1,9 @@
 package app.shelfmark.ui.library
 
+import app.shelfmark.ui.components.LanguageButton
+import app.shelfmark.R
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -80,7 +84,7 @@ fun LibraryScreen(
                 ExtendedFloatingActionButton(
                     onClick = onScan,
                     icon = { Icon(Icons.Rounded.QrCodeScanner, contentDescription = null) },
-                    text = { Text("Scan a book", style = MaterialTheme.typography.labelLarge) },
+                    text = { Text(stringResource(R.string.scan_a_book), style = MaterialTheme.typography.labelLarge) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 )
@@ -128,7 +132,7 @@ private fun LibraryHeader(state: LibraryState, onAddByHand: () -> Unit) {
     Row(verticalAlignment = Alignment.Top) {
         Column(Modifier.weight(1f)) {
             Text(
-                "Your library",
+                stringResource(R.string.your_library),
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -141,18 +145,20 @@ private fun LibraryHeader(state: LibraryState, onAddByHand: () -> Unit) {
                 )
             }
         }
+        LanguageButton(Modifier.padding(top = 2.dp))
         if (state.totalCount > 0) {
+            Spacer(Modifier.width(8.dp))
             FilledTonalIconButton(onClick = onAddByHand, modifier = Modifier.padding(top = 2.dp)) {
-                Icon(Icons.Rounded.Add, contentDescription = "Add a book by hand")
+                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.add_by_hand))
             }
         }
     }
 }
 
+@Composable
 private fun summaryLine(s: LibraryState): String {
-    val books = if (s.totalCount == 1) "1 book" else "${s.totalCount} books"
-    val avg = s.averageRating?.let { ", averaging %.1f stars".format(it) } ?: ""
-    return "$books read$avg"
+    val books = pluralStringResource(R.plurals.books_read, s.totalCount, s.totalCount)
+    return s.averageRating?.let { stringResource(R.string.books_read_with_average, books, it) } ?: books
 }
 
 @Composable
@@ -162,12 +168,12 @@ private fun SearchField(query: String, onChange: (String) -> Unit, modifier: Mod
         value = query,
         onValueChange = onChange,
         modifier = modifier.fillMaxWidth(),
-        placeholder = { Text("Search titles, authors or notes") },
+        placeholder = { Text(stringResource(R.string.search_placeholder)) },
         leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
         trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onChange("") }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.clear_search))
                 }
             }
         },
@@ -194,7 +200,7 @@ private fun SortRow(sort: SortMode, onChange: (SortMode) -> Unit, modifier: Modi
             FilterChip(
                 selected = mode == sort,
                 onClick = { onChange(mode) },
-                label = { Text(mode.label, style = MaterialTheme.typography.labelMedium) },
+                label = { Text(stringResource(mode.label), style = MaterialTheme.typography.labelMedium) },
             )
         }
     }
@@ -235,7 +241,7 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
                 RatingBar(book.rating, starSize = 17.dp, spacing = 1.dp)
             } else {
                 Text(
-                    "Not rated yet",
+                    stringResource(R.string.not_rated),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline,
                 )
@@ -265,14 +271,13 @@ private fun EmptyLibrary(onScan: () -> Unit, onAddByHand: () -> Unit) {
         StackOfBooks()
         Spacer(Modifier.height(36.dp))
         Text(
-            "Start your reading log",
+            stringResource(R.string.empty_title),
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "Scan the barcode on the back of a book you've read, or photograph its cover. " +
-                "Rate it, write down what you thought, and it's here whenever you need to remember.",
+            stringResource(R.string.empty_body),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -285,11 +290,11 @@ private fun EmptyLibrary(onScan: () -> Unit, onAddByHand: () -> Unit) {
         ) {
             Icon(Icons.Rounded.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
-            Text("Scan your first book", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.scan_first_book), style = MaterialTheme.typography.labelLarge)
         }
         Spacer(Modifier.height(8.dp))
         TextButton(onClick = onAddByHand) {
-            Text("Add a book by hand", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.add_by_hand), style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -333,13 +338,13 @@ private fun NoResults(query: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            "Nothing matches \u201c${query.trim()}\u201d",
+            stringResource(R.string.no_results, query.trim()),
             style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Try part of a title, an author's name or a word from your notes.",
+            stringResource(R.string.no_results_hint),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

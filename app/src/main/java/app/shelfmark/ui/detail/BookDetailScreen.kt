@@ -1,5 +1,8 @@
 package app.shelfmark.ui.detail
 
+import androidx.compose.ui.platform.LocalConfiguration
+import app.shelfmark.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -55,7 +58,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.data.Book
 import app.shelfmark.data.coverModel
 import app.shelfmark.ui.components.BookCover
-import app.shelfmark.ui.components.NotesPlaceholder
 import app.shelfmark.ui.components.RatingBar
 import app.shelfmark.ui.components.formatDate
 import app.shelfmark.ui.components.ratingLabel
@@ -81,15 +83,15 @@ fun BookDetailScreen(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = onEdit, enabled = book != null) {
-                        Icon(Icons.Rounded.Edit, contentDescription = "Edit details")
+                        Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.edit_details))
                     }
                     IconButton(onClick = { confirmDelete = true }, enabled = book != null) {
-                        Icon(Icons.Rounded.DeleteOutline, contentDescription = "Remove from library")
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = stringResource(R.string.remove_from_library))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -113,10 +115,10 @@ fun BookDetailScreen(
     if (confirmDelete && current != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Remove this book?", style = MaterialTheme.typography.headlineSmall) },
+            title = { Text(stringResource(R.string.remove_title), style = MaterialTheme.typography.headlineSmall) },
             text = {
                 Text(
-                    "\u201c${current.title}\u201d and your rating and notes will be deleted from your library.",
+                    stringResource(R.string.remove_body, current.title),
                     style = MaterialTheme.typography.bodyLarge,
                 )
             },
@@ -124,10 +126,10 @@ fun BookDetailScreen(
                 TextButton(onClick = {
                     confirmDelete = false
                     vm.delete(onDone = onBack)
-                }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.remove), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Keep it") }
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.keep_it)) }
             },
         )
     }
@@ -197,21 +199,22 @@ private fun DetailContent(
 
         book.description?.let { DescriptionSection(it) }
 
+        val locale = LocalConfiguration.current.locales[0]
         val facts = buildList {
-            book.publishedDate?.let { add("Published" to it) }
-            book.publisher?.let { add("Publisher" to it) }
-            book.pageCount?.let { add("Pages" to it.toString()) }
-            book.isbn?.let { add("ISBN" to it) }
-            add("Added" to formatDate(book.addedAt))
+            book.publishedDate?.let { add(R.string.published to it) }
+            book.publisher?.let { add(R.string.publisher to it) }
+            book.pageCount?.let { add(R.string.pages to it.toString()) }
+            book.isbn?.let { add(R.string.isbn to it) }
+            add(R.string.added to formatDate(book.addedAt, locale))
         }
         Spacer(Modifier.height(36.dp))
-        Text("Details", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.details), style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             facts.forEach { (label, value) ->
                 Row {
                     Text(
-                        label,
+                        stringResource(label),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(104.dp),
@@ -229,9 +232,9 @@ private fun NotesSection(notes: String, onSave: (String) -> Unit) {
     var draft by rememberSaveable(notes) { mutableStateOf(notes) }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Your notes", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.your_notes), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
         if (!editing && notes.isNotBlank()) {
-            TextButton(onClick = { draft = notes; editing = true }) { Text("Edit") }
+            TextButton(onClick = { draft = notes; editing = true }) { Text(stringResource(R.string.edit)) }
         }
     }
     Spacer(Modifier.height(10.dp))
@@ -243,7 +246,7 @@ private fun NotesSection(notes: String, onSave: (String) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 6,
                 textStyle = ReadingStyle.copy(color = MaterialTheme.colorScheme.onSurface),
-                placeholder = { Text(NotesPlaceholder, style = ReadingStyle) },
+                placeholder = { Text(stringResource(R.string.notes_placeholder), style = ReadingStyle) },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
             Row(
@@ -252,9 +255,9 @@ private fun NotesSection(notes: String, onSave: (String) -> Unit) {
                     .padding(top = 10.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = { draft = notes; editing = false }) { Text("Cancel") }
+                TextButton(onClick = { draft = notes; editing = false }) { Text(stringResource(R.string.cancel)) }
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = { onSave(draft.trim()); editing = false }) { Text("Save notes") }
+                Button(onClick = { onSave(draft.trim()); editing = false }) { Text(stringResource(R.string.save_notes)) }
             }
         }
         notes.isBlank() -> OutlinedButton(
@@ -265,7 +268,7 @@ private fun NotesSection(notes: String, onSave: (String) -> Unit) {
         ) {
             Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
-            Text("Write down your thoughts", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.write_thoughts), style = MaterialTheme.typography.labelLarge)
         }
         else -> SelectionContainer {
             Text(notes, style = ReadingStyle, color = MaterialTheme.colorScheme.onSurface)
@@ -278,7 +281,7 @@ private fun DescriptionSection(description: String) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val long = description.length > 320
     Spacer(Modifier.height(36.dp))
-    Text("About this book", style = MaterialTheme.typography.titleLarge)
+    Text(stringResource(R.string.about_book), style = MaterialTheme.typography.titleLarge)
     Spacer(Modifier.height(10.dp))
     Text(
         description,
@@ -290,7 +293,7 @@ private fun DescriptionSection(description: String) {
     )
     if (long) {
         TextButton(onClick = { expanded = !expanded }, modifier = Modifier.padding(start = 0.dp)) {
-            Text(if (expanded) "Show less" else "Show more")
+            Text(stringResource(if (expanded) R.string.show_less else R.string.show_more))
         }
     }
 }

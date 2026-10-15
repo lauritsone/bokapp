@@ -1,3 +1,109 @@
 <resources>
-    <string name="app_name">Shelfmark</string>
+    <string name="app_name" translatable="false">Shelfmark</string>
+
+    <!-- Shared -->
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="edit">Edit</string>
+    <string name="untitled">Untitled</string>
+    <string name="isbn" translatable="false">ISBN</string>
+    <string name="your_notes">Your notes</string>
+    <string name="notes_placeholder">What stayed with you? A favourite line, how it made you feel, who you\'d give it to…</string>
+
+    <!-- Language -->
+    <string name="language">Language</string>
+    <string name="language_system">Phone default</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_norwegian" translatable="false">Norsk</string>
+
+    <!-- Rating -->
+    <string name="rating_none">Tap a star to rate</string>
+    <string name="rating_1">Didn\'t like it</string>
+    <string name="rating_2">It was okay</string>
+    <string name="rating_3">Liked it</string>
+    <string name="rating_4">Really liked it</string>
+    <string name="rating_5">Loved it</string>
+    <string name="rated_out_of_5">Rated %1$d out of 5</string>
+    <string name="rate_out_of_5">Rate %1$d out of 5</string>
+    <plurals name="stars">
+        <item quantity="one">%1$d star</item>
+        <item quantity="other">%1$d stars</item>
+    </plurals>
+
+    <!-- Library -->
+    <string name="your_library">Your library</string>
+    <plurals name="books_read">
+        <item quantity="one">%1$d book read</item>
+        <item quantity="other">%1$d books read</item>
+    </plurals>
+    <string name="books_read_with_average">%1$s, averaging %2$.1f stars</string>
+    <string name="scan_a_book">Scan a book</string>
+    <string name="add_by_hand">Add a book by hand</string>
+    <string name="search_placeholder">Search titles, authors or notes</string>
+    <string name="clear_search">Clear search</string>
+    <string name="sort_recent">Recently added</string>
+    <string name="sort_rating">Highest rated</string>
+    <string name="sort_title">Title</string>
+    <string name="sort_author">Author</string>
+    <string name="not_rated">Not rated yet</string>
+    <string name="empty_title">Start your reading log</string>
+    <string name="empty_body">Scan the barcode on the back of a book you\'ve read, or photograph its cover. Rate it, write down what you thought, and it\'s here whenever you need to remember.</string>
+    <string name="scan_first_book">Scan your first book</string>
+    <string name="no_results">Nothing matches “%1$s”</string>
+    <string name="no_results_hint">Try part of a title, an author\'s name or a word from your notes.</string>
+
+    <!-- Book page -->
+    <string name="edit_details">Edit details</string>
+    <string name="remove_from_library">Remove from library</string>
+    <string name="remove_title">Remove this book?</string>
+    <string name="remove_body">“%1$s” and your rating and notes will be deleted from your library.</string>
+    <string name="remove">Remove</string>
+    <string name="keep_it">Keep it</string>
+    <string name="published">Published</string>
+    <string name="publisher">Publisher</string>
+    <string name="pages">Pages</string>
+    <string name="added">Added</string>
+    <string name="details">Details</string>
+    <string name="save_notes">Save notes</string>
+    <string name="write_thoughts">Write down your thoughts</string>
+    <string name="about_book">About this book</string>
+    <string name="show_less">Show less</string>
+    <string name="show_more">Show more</string>
+
+    <!-- Add / edit -->
+    <string name="new_book">New book</string>
+    <string name="your_rating">Your rating</string>
+    <string name="finding_isbn">Finding ISBN %1$s…</string>
+    <string name="title">Title</string>
+    <string name="author">Author</string>
+    <string name="isbn_supporting">Search fills in the title, author and cover for you</string>
+    <string name="look_up_isbn">Look up this ISBN</string>
+    <string name="save_to_library">Save to library</string>
+    <string name="save_changes">Save changes</string>
+    <string name="add_title_hint">Add a title to save this book.</string>
+    <string name="msg_invalid_isbn">That ISBN doesn\'t check out. Look for 10 or 13 digits near the barcode.</string>
+    <string name="msg_offline">No connection to the book database. Fill in the details below, or try the lookup again later.</string>
+    <string name="msg_not_found">ISBN %1$s isn\'t in the online catalogues yet. Add the title and author below.</string>
+    <string name="already_logged_title">You\'ve logged this one</string>
+    <string name="already_logged_body">This book is already in your library. Open it to change your rating or add to your notes.</string>
+    <string name="open_book">Open book</string>
+    <string name="go_back">Go back</string>
+
+    <!-- Scanner -->
+    <string name="mode_barcode">Barcode</string>
+    <string name="mode_cover">Cover photo</string>
+    <string name="hint_barcode">Point at the barcode on the back cover</string>
+    <string name="hint_cover">Fit the front cover inside the frame</string>
+    <string name="type_isbn_short">Type ISBN</string>
+    <string name="photo_failed">The photo wasn\'t saved. Hold steady and try again.</string>
+    <string name="take_cover_photo">Take cover photo</string>
+    <string name="camera_off_title">Camera access is off</string>
+    <string name="camera_off_body">Shelfmark uses the camera to read a book\'s barcode or photograph its cover. Photos stay on this phone.</string>
+    <string name="allow_camera">Allow camera</string>
+    <string name="open_settings">Open settings</string>
+    <string name="type_isbn_instead">Type the ISBN instead</string>
+    <string name="type_isbn_title">Type the ISBN</string>
+    <string name="type_isbn_body">It\'s the 10 or 13 digits printed above the barcode, or on the copyright page.</string>
+    <string name="isbn_invalid">Check the digits. This isn\'t a valid ISBN.</string>
+    <string name="look_up_book">Look up book</string>
 </resources>

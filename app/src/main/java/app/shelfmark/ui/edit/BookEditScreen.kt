@@ -1,5 +1,7 @@
 package app.shelfmark.ui.edit
 
+import app.shelfmark.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,7 +55,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.data.coverModel
 import app.shelfmark.ui.components.BookCover
 import app.shelfmark.ui.components.CoverShape
-import app.shelfmark.ui.components.NotesPlaceholder
 import app.shelfmark.ui.components.RatingBar
 import app.shelfmark.ui.components.ratingLabel
 import app.shelfmark.ui.components.rememberRepository
@@ -83,10 +84,10 @@ fun BookEditScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(if (isNew) "New book" else "Edit details", style = MaterialTheme.typography.titleLarge) },
+                title = { Text(stringResource(if (isNew) R.string.new_book else R.string.edit_details), style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -124,7 +125,7 @@ fun BookEditScreen(
                     }
                     Spacer(Modifier.width(20.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Your rating", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.your_rating), style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(6.dp))
                         RatingBar(
                             rating = book.rating,
@@ -144,14 +145,20 @@ fun BookEditScreen(
                 if (state.loading) {
                     Spacer(Modifier.height(20.dp))
                     Text(
-                        "Finding ISBN ${book.isbn.orEmpty()}…",
+                        stringResource(R.string.finding_isbn, book.isbn.orEmpty()),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 state.message?.let {
                     Spacer(Modifier.height(20.dp))
-                    Notice(it)
+                    Notice(
+                        when (it) {
+                            EditMessage.InvalidIsbn -> stringResource(R.string.msg_invalid_isbn)
+                            EditMessage.Offline -> stringResource(R.string.msg_offline)
+                            is EditMessage.NotFound -> stringResource(R.string.msg_not_found, it.isbn)
+                        },
+                    )
                 }
 
                 Spacer(Modifier.height(28.dp))
@@ -159,7 +166,7 @@ fun BookEditScreen(
                     OutlinedTextField(
                         value = book.title,
                         onValueChange = { v -> vm.update { it.copy(title = v) } },
-                        label = { Text("Title") },
+                        label = { Text(stringResource(R.string.title)) },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyLarge,
                         maxLines = 3,
@@ -171,7 +178,7 @@ fun BookEditScreen(
                     OutlinedTextField(
                         value = book.authors,
                         onValueChange = { v -> vm.update { it.copy(authors = v) } },
-                        label = { Text("Author") },
+                        label = { Text(stringResource(R.string.author)) },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyLarge,
                         singleLine = true,
@@ -183,16 +190,16 @@ fun BookEditScreen(
                     OutlinedTextField(
                         value = book.isbn.orEmpty(),
                         onValueChange = { v -> vm.update { it.copy(isbn = v.take(17).ifBlank { null }) } },
-                        label = { Text("ISBN") },
+                        label = { Text(stringResource(R.string.isbn)) },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyLarge,
                         singleLine = true,
-                        supportingText = { Text("Search fills in the title, author and cover for you") },
+                        supportingText = { Text(stringResource(R.string.isbn_supporting)) },
                         trailingIcon = {
                             IconButton(
                                 onClick = vm::lookupIsbn,
                                 enabled = !state.loading && !book.isbn.isNullOrBlank(),
-                            ) { Icon(Icons.Rounded.Search, contentDescription = "Look up this ISBN") }
+                            ) { Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.look_up_isbn)) }
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { vm.lookupIsbn() }),
@@ -201,7 +208,7 @@ fun BookEditScreen(
                         OutlinedTextField(
                             value = book.publishedDate.orEmpty(),
                             onValueChange = { v -> vm.update { it.copy(publishedDate = v.ifBlank { null }) } },
-                            label = { Text("Published") },
+                            label = { Text(stringResource(R.string.published)) },
                             modifier = Modifier.weight(1f),
                             textStyle = MaterialTheme.typography.bodyLarge,
                             singleLine = true,
@@ -211,7 +218,7 @@ fun BookEditScreen(
                             onValueChange = { v ->
                                 vm.update { it.copy(pageCount = v.filter(Char::isDigit).take(5).toIntOrNull()) }
                             },
-                            label = { Text("Pages") },
+                            label = { Text(stringResource(R.string.pages)) },
                             modifier = Modifier.weight(1f),
                             textStyle = MaterialTheme.typography.bodyLarge,
                             singleLine = true,
@@ -221,8 +228,8 @@ fun BookEditScreen(
                     OutlinedTextField(
                         value = book.notes,
                         onValueChange = { v -> vm.update { it.copy(notes = v) } },
-                        label = { Text("Your notes") },
-                        placeholder = { Text(NotesPlaceholder, style = ReadingStyle) },
+                        label = { Text(stringResource(R.string.your_notes)) },
+                        placeholder = { Text(stringResource(R.string.notes_placeholder), style = ReadingStyle) },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = ReadingStyle.copy(color = MaterialTheme.colorScheme.onSurface),
                         minLines = 6,
@@ -238,12 +245,12 @@ fun BookEditScreen(
                         .fillMaxWidth()
                         .height(56.dp),
                 ) {
-                    Text(if (isNew) "Save to library" else "Save changes", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(if (isNew) R.string.save_to_library else R.string.save_changes), style = MaterialTheme.typography.labelLarge)
                 }
                 if (book.title.isBlank() && !state.loading) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Add a title to save this book.",
+                        stringResource(R.string.add_title_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -283,19 +290,19 @@ private fun AlreadyInLibrary(onOpen: () -> Unit, onScanAnother: () -> Unit) {
             .padding(top = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("You've logged this one", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.already_logged_title), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(10.dp))
         Text(
-            "This book is already in your library. Open it to change your rating or add to your notes.",
+            stringResource(R.string.already_logged_body),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
         Button(onClick = onOpen, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("Open book", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.open_book), style = MaterialTheme.typography.labelLarge)
         }
         TextButton(onClick = onScanAnother) {
-            Text("Go back", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.go_back), style = MaterialTheme.typography.labelLarge)
         }
     }
 }

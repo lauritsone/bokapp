@@ -1,5 +1,6 @@
 package app.shelfmark.ui.components
 
+import java.util.Locale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -16,10 +17,6 @@ fun rememberRepository(): BookRepository {
     return remember { (context.applicationContext as ShelfmarkApp).repository }
 }
 
-private val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-
-fun formatDate(epochMillis: Long): String =
-    dateFormat.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
-
-const val NotesPlaceholder =
-    "What stayed with you? A favourite line, how it made you feel, who you'd give it to…"
+fun formatDate(epochMillis: Long, locale: Locale): String =
+    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+        .format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
