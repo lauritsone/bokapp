@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.Book
 import app.shelfmark.data.BookRepository
+import app.shelfmark.data.Shelf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,9 +22,14 @@ enum class SortMode(@StringRes val label: Int) {
 }
 
 data class LibraryState(
+    /** Books on the selected shelf that match the search. */
     val books: List<Book> = emptyList(),
+    /** Books on every shelf; zero means the library is empty. */
     val totalCount: Int = 0,
+    val shelfCounts: Map<Shelf, Int> = emptyMap(),
+    /** Average over finished books only. */
     val averageRating: Double? = null,
+    val shelf: Shelf = Shelf.Read,
     val sort: SortMode = SortMode.Recent,
     val loaded: Boolean = false,
 )
@@ -32,10 +38,12 @@ class LibraryViewModel(repo: BookRepository) : ViewModel() {
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
     private val sort = MutableStateFlow(SortMode.Recent)
+    private val shelf = MutableStateFlow(Shelf.Read)
 
-    val state: StateFlow<LibraryState> = combine(repo.books, _query, sort) { all, q, s ->
+    val state: StateFlow<LibraryState> = combine(repo.books, _query, sort, shelf) { all, q, s, sh ->
         val needle = q.trim()
-        val filtered = if (needle.isEmpty()) all else all.filter {
+        val onShelf = all.filter { it.shelf == sh }
+        val filtered = if (needle.isEmpty()) onShelf else onShelf.filter {
             it.title.contains(needle, ignoreCase = true) ||
                 it.authors.contains(needle, ignoreCase = true) ||
                 it.notes.contains(needle, ignoreCase = true) ||
@@ -49,11 +57,13 @@ class LibraryViewModel(repo: BookRepository) : ViewModel() {
             SortMode.Title -> filtered.sortedBy { it.title.lowercase() }
             SortMode.Author -> filtered.sortedBy { it.authors.lowercase() }
         }
-        val rated = all.filter { it.rating > 0 }
+        val rated = all.filter { it.shelf == Shelf.Read && it.rating > 0 }
         LibraryState(
             books = sorted,
             totalCount = all.size,
+            shelfCounts = all.groupingBy { it.shelf }.eachCount(),
             averageRating = if (rated.isEmpty()) null else rated.map { it.rating }.average(),
+            shelf = sh,
             sort = s,
             loaded = true,
         )
@@ -61,6 +71,10 @@ class LibraryViewModel(repo: BookRepository) : ViewModel() {
 
     fun setQuery(q: String) {
         _query.value = q
+    }
+
+    fun setShelf(s: Shelf) {
+        shelf.value = s
     }
 
     fun setSort(s: SortMode) {

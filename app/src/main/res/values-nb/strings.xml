@@ -9,6 +9,7 @@
 
     <!-- Language -->
     <string name="language">Språk</string>
+    <string name="more_options">Flere valg</string>
     <string name="language_system">Telefonens språk</string>
 
     <!-- Rating -->
@@ -101,4 +102,22 @@
     <string name="type_isbn_body">Det er de 10 eller 13 sifrene over strekkoden, eller på kolofonsiden.</string>
     <string name="isbn_invalid">Sjekk sifrene. Dette er ikke et gyldig ISBN.</string>
     <string name="look_up_book">Slå opp boken</string>
+
+    <!-- Shelves -->
+    <string name="shelf_read">Lest</string>
+    <string name="shelf_reading">Leser nå</string>
+    <string name="shelf_want">Vil lese</string>
+    <string name="empty_shelf_read">Ingen ferdige bøker ennå. Når du er ferdig med en, merker du den som «Lest».</string>
+    <string name="empty_shelf_reading">Ingen bøker på gang. Merk en bok som «Leser nå» for å ha den her.</string>
+    <string name="empty_shelf_want">Ønskelisten er tom. Skann en bok du vil lese senere.</string>
+
+    <!-- Export -->
+    <string name="export_library">Eksporter biblioteket</string>
+    <string name="export_csv">Regneark (CSV)</string>
+    <string name="export_json">Sikkerhetskopi (JSON)</string>
+    <plurals name="export_done">
+        <item quantity="one">Eksporterte %1$d bok</item>
+        <item quantity="other">Eksporterte %1$d bøker</item>
+    </plurals>
+    <string name="export_failed">Kunne ikke lagre filen. Prøv igjen.</string>
 </resources>

@@ -11,6 +11,9 @@ interface BookDao {
     @Query("SELECT * FROM books ORDER BY addedAt DESC")
     fun observeAll(): Flow<List<Book>>
 
+    @Query("SELECT * FROM books ORDER BY addedAt")
+    suspend fun getAll(): List<Book>
+
     @Query("SELECT * FROM books WHERE id = :id")
     fun observe(id: Long): Flow<Book?>
 
@@ -28,6 +31,9 @@ interface BookDao {
 
     @Query("UPDATE books SET notes = :notes, updatedAt = :now WHERE id = :id")
     suspend fun setNotes(id: Long, notes: String, now: Long)
+
+    @Query("UPDATE books SET shelf = :shelf, updatedAt = :now WHERE id = :id")
+    suspend fun setShelf(id: Long, shelf: Shelf, now: Long)
 
     @Delete
     suspend fun delete(book: Book)

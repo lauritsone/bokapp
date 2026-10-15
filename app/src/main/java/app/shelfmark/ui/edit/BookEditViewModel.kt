@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.Book
 import app.shelfmark.data.BookRepository
 import app.shelfmark.data.Isbn
+import app.shelfmark.data.Shelf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,9 +34,10 @@ class BookEditViewModel(
     bookId: Long,
     isbn: String?,
     photoPath: String?,
+    shelf: Shelf,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(EditState(book = Book(isbn = isbn, photoPath = photoPath)))
+    private val _state = MutableStateFlow(EditState(book = Book(isbn = isbn, photoPath = photoPath, shelf = shelf)))
     val state: StateFlow<EditState> = _state.asStateFlow()
 
     init {

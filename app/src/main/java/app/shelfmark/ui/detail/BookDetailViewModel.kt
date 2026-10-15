@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.Book
 import app.shelfmark.data.BookRepository
+import app.shelfmark.data.Shelf
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -19,6 +20,10 @@ class BookDetailViewModel(
 
     fun setRating(rating: Int) {
         viewModelScope.launch { repo.setRating(id, rating) }
+    }
+
+    fun setShelf(shelf: Shelf) {
+        viewModelScope.launch { repo.setShelf(id, shelf) }
     }
 
     fun saveNotes(notes: String) {

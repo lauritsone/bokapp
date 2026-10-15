@@ -2,6 +2,8 @@ package app.shelfmark.ui.detail
 
 import androidx.compose.ui.platform.LocalConfiguration
 import app.shelfmark.R
+import app.shelfmark.data.Shelf
+import app.shelfmark.ui.components.ShelfSelector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -105,6 +107,7 @@ fun BookDetailScreen(
             DetailContent(
                 book = current,
                 onRate = vm::setRating,
+                onShelf = vm::setShelf,
                 onSaveNotes = vm::saveNotes,
                 modifier = Modifier.padding(padding),
             )
@@ -139,6 +142,7 @@ fun BookDetailScreen(
 private fun DetailContent(
     book: Book,
     onRate: (Int) -> Unit,
+    onShelf: (Shelf) -> Unit,
     onSaveNotes: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -177,6 +181,9 @@ private fun DetailContent(
         }
 
         Spacer(Modifier.height(24.dp))
+        ShelfSelector(book.shelf, onShelf)
+
+        Spacer(Modifier.height(16.dp))
         Column(
             Modifier
                 .fillMaxWidth()

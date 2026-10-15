@@ -1,7 +1,9 @@
 package app.shelfmark.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.TypeConverter
 import java.io.File
 
 @Entity(tableName = "books")
@@ -21,9 +23,27 @@ data class Book(
     /** 0 = not rated, otherwise 1–5 stars. */
     val rating: Int = 0,
     val notes: String = "",
+    @ColumnInfo(defaultValue = "0") val shelf: Shelf = Shelf.Read,
     val addedAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
+
+/** Which list a book is on. Stored as [code]; books from before shelves existed are [Read]. */
+enum class Shelf(val code: Int, val key: String) {
+    Read(0, "read"),
+    Reading(1, "reading"),
+    WantToRead(2, "want_to_read"),
+    ;
+
+    companion object {
+        fun fromCode(code: Int) = entries.firstOrNull { it.code == code } ?: Read
+    }
+}
+
+class Converters {
+    @TypeConverter fun shelfToCode(shelf: Shelf): Int = shelf.code
+    @TypeConverter fun codeToShelf(code: Int): Shelf = Shelf.fromCode(code)
+}
 
 /** The user's own photo wins over the online cover. */
 fun Book.coverModel(): Any? = photoPath?.let { File(it) } ?: coverUrl

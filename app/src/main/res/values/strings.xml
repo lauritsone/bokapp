@@ -12,6 +12,7 @@
 
     <!-- Language -->
     <string name="language">Language</string>
+    <string name="more_options">More options</string>
     <string name="language_system">Phone default</string>
     <string name="language_english" translatable="false">English</string>
     <string name="language_norwegian" translatable="false">Norsk</string>
@@ -106,4 +107,23 @@
     <string name="type_isbn_body">It\'s the 10 or 13 digits printed above the barcode, or on the copyright page.</string>
     <string name="isbn_invalid">Check the digits. This isn\'t a valid ISBN.</string>
     <string name="look_up_book">Look up book</string>
+
+    <!-- Shelves -->
+    <string name="shelf_read">Read</string>
+    <string name="shelf_reading">Reading</string>
+    <string name="shelf_want">Want to read</string>
+    <string name="shelf_with_count" translatable="false">%1$s · %2$d</string>
+    <string name="empty_shelf_read">No finished books yet. When you finish one, mark it as Read.</string>
+    <string name="empty_shelf_reading">Nothing on the go. Mark a book as Reading to keep it here.</string>
+    <string name="empty_shelf_want">Your wishlist is empty. Scan a book you want to read later.</string>
+
+    <!-- Export -->
+    <string name="export_library">Export library</string>
+    <string name="export_csv">Spreadsheet (CSV)</string>
+    <string name="export_json">Backup file (JSON)</string>
+    <plurals name="export_done">
+        <item quantity="one">Exported %1$d book</item>
+        <item quantity="other">Exported %1$d books</item>
+    </plurals>
+    <string name="export_failed">Couldn\'t save the file. Try again.</string>
 </resources>

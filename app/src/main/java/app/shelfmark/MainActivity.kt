@@ -6,11 +6,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import app.shelfmark.data.Shelf
 import app.shelfmark.ui.detail.BookDetailScreen
 import app.shelfmark.ui.edit.BookEditScreen
 import app.shelfmark.ui.library.LibraryScreen
@@ -32,16 +34,22 @@ class MainActivity : AppCompatActivity() {
 
 private object Routes {
     const val LIBRARY = "library"
-    const val SCAN = "scan"
+    const val SCAN = "scan?shelf={shelf}"
     const val DETAIL = "book/{id}"
-    const val EDIT = "edit?id={id}&isbn={isbn}&photo={photo}"
+    const val EDIT = "edit?id={id}&isbn={isbn}&photo={photo}&shelf={shelf}"
 
+    // New books go on the shelf the user was looking at.
+    fun scan(shelf: Shelf) = "scan?shelf=${shelf.code}"
     fun detail(id: Long) = "book/$id"
     fun editExisting(id: Long) = "edit?id=$id"
-    fun newFromIsbn(isbn: String) = "edit?isbn=$isbn"
-    fun newFromPhoto(path: String) = "edit?photo=${Uri.encode(path)}"
-    const val NEW_BY_HAND = "edit"
+    fun newFromIsbn(isbn: String, shelf: Shelf) = "edit?isbn=$isbn&shelf=${shelf.code}"
+    fun newFromPhoto(path: String, shelf: Shelf) = "edit?photo=${Uri.encode(path)}&shelf=${shelf.code}"
+    fun newByHand(shelf: Shelf) = "edit?shelf=${shelf.code}"
 }
+
+private val shelfArgument = navArgument("shelf") { type = NavType.IntType; defaultValue = Shelf.Read.code }
+
+private fun NavBackStackEntry.shelf() = Shelf.fromCode(arguments?.getInt("shelf") ?: Shelf.Read.code)
 
 @Composable
 private fun ShelfmarkNavHost() {
@@ -50,21 +58,22 @@ private fun ShelfmarkNavHost() {
     NavHost(navController = nav, startDestination = Routes.LIBRARY) {
         composable(Routes.LIBRARY) {
             LibraryScreen(
-                onScan = { nav.navigate(Routes.SCAN) },
-                onAddByHand = { nav.navigate(Routes.NEW_BY_HAND) },
+                onScan = { shelf -> nav.navigate(Routes.scan(shelf)) },
+                onAddByHand = { shelf -> nav.navigate(Routes.newByHand(shelf)) },
                 onOpen = { id -> nav.navigate(Routes.detail(id)) },
             )
         }
 
-        composable(Routes.SCAN) {
+        composable(Routes.SCAN, arguments = listOf(shelfArgument)) { entry ->
+            val shelf = entry.shelf()
             ScanScreen(
                 onBack = { nav.popBackStack() },
                 // Replace the scanner with the new-book screen, so Back returns to the library.
                 onIsbn = { isbn ->
-                    nav.navigate(Routes.newFromIsbn(isbn)) { popUpTo(Routes.SCAN) { inclusive = true } }
+                    nav.navigate(Routes.newFromIsbn(isbn, shelf)) { popUpTo(Routes.SCAN) { inclusive = true } }
                 },
                 onPhoto = { path ->
-                    nav.navigate(Routes.newFromPhoto(path)) { popUpTo(Routes.SCAN) { inclusive = true } }
+                    nav.navigate(Routes.newFromPhoto(path, shelf)) { popUpTo(Routes.SCAN) { inclusive = true } }
                 },
             )
         }
@@ -87,6 +96,7 @@ private fun ShelfmarkNavHost() {
                 navArgument("id") { type = NavType.LongType; defaultValue = 0L },
                 navArgument("isbn") { type = NavType.StringType; nullable = true; defaultValue = null },
                 navArgument("photo") { type = NavType.StringType; nullable = true; defaultValue = null },
+                shelfArgument,
             ),
         ) { entry ->
             val args = entry.arguments
@@ -95,6 +105,7 @@ private fun ShelfmarkNavHost() {
                 bookId = id,
                 isbn = args?.getString("isbn"),
                 photoPath = args?.getString("photo"),
+                shelf = entry.shelf(),
                 onBack = { nav.popBackStack() },
                 onSaved = { savedId ->
                     if (id == 0L) {

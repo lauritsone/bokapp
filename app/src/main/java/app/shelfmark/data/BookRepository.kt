@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.OutputStream
 
 class BookRepository(
     private val dao: BookDao,
@@ -31,6 +32,16 @@ class BookRepository(
 
     suspend fun setNotes(id: Long, notes: String) =
         dao.setNotes(id, notes, System.currentTimeMillis())
+
+    suspend fun setShelf(id: Long, shelf: Shelf) =
+        dao.setShelf(id, shelf, System.currentTimeMillis())
+
+    /** Writes every book to [out] and returns how many were exported. */
+    suspend fun export(format: ExportFormat, out: OutputStream): Int = withContext(Dispatchers.IO) {
+        val books = dao.getAll()
+        out.use { LibraryExport.write(format, books, it) }
+        books.size
+    }
 
     suspend fun delete(book: Book) {
         dao.delete(book)

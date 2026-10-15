@@ -12,6 +12,9 @@ Everything is stored on the phone.
 - **1–5 star rating**: tap to rate, tap the same star again to clear. Shown in the list and on each book.
 - **Your notes**: a serif writing area for thoughts, quotes and recommendations. Notes are searchable.
 - **Library**: search by title, author, ISBN or notes. Sort by recently added, highest rated, title or author.
+- **Shelves**: keep books under *Read*, *Reading* or *Want to read*. Switch shelves in the library; a book scanned from a shelf lands on it, and you can move it from the book's page.
+- **Export**: save the whole library as a spreadsheet (CSV, opens in Excel or Google Sheets) or a JSON backup, to Downloads, Drive or anywhere else.
+- **English and Norwegian**: pick the language from the ⋮ menu, or follow the phone's language.
 - **Duplicate check**: scanning a book you've already logged takes you to its page.
 - Light and dark themes, edge-to-edge layout and TalkBack labels on all controls.
 
@@ -60,7 +63,6 @@ Kotlin 2.0, Jetpack Compose with Material 3, Room, CameraX 1.4, ML Kit Barcode S
 
 ## Ideas for next steps
 
-- Export and import the library as JSON or CSV, or back it up to Drive
-- "Currently reading" and "Want to read" shelves
+- Import a JSON backup
 - A finished date and a yearly reading goal
 - Google Books API key in `BookLookup` if you hit the anonymous quota

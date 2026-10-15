@@ -1,6 +1,8 @@
 package app.shelfmark.ui.edit
 
 import app.shelfmark.R
+import app.shelfmark.data.Shelf
+import app.shelfmark.ui.components.ShelfSelector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -66,13 +68,14 @@ fun BookEditScreen(
     bookId: Long,
     isbn: String?,
     photoPath: String?,
+    shelf: Shelf,
     onBack: () -> Unit,
     onSaved: (Long) -> Unit,
     onOpenExisting: (Long) -> Unit,
 ) {
     val repo = rememberRepository()
     val vm: BookEditViewModel = viewModel(
-        factory = viewModelFactory { initializer { BookEditViewModel(repo, bookId, isbn, photoPath) } },
+        factory = viewModelFactory { initializer { BookEditViewModel(repo, bookId, isbn, photoPath, shelf) } },
     )
     val state by vm.state.collectAsStateWithLifecycle()
     val book = state.book
@@ -141,6 +144,9 @@ fun BookEditScreen(
                         )
                     }
                 }
+
+                Spacer(Modifier.height(20.dp))
+                ShelfSelector(book.shelf, onChange = { s -> vm.update { it.copy(shelf = s) } })
 
                 if (state.loading) {
                     Spacer(Modifier.height(20.dp))

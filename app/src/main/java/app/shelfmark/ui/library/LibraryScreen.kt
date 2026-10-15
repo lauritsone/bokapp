@@ -1,6 +1,28 @@
 package app.shelfmark.ui.library
 
-import app.shelfmark.ui.components.LanguageButton
+import kotlinx.coroutines.launch
+import java.io.IOException
+import app.shelfmark.ui.components.label
+import app.shelfmark.ui.components.ShelfOrder
+import app.shelfmark.ui.components.LanguageMenuItems
+import app.shelfmark.data.Shelf
+import app.shelfmark.data.LibraryExport
+import app.shelfmark.data.ExportFormat
+import app.shelfmark.data.BookRepository
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.FileDownload
+import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.net.Uri
 import app.shelfmark.R
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -68,21 +90,24 @@ import app.shelfmark.ui.theme.LocalStarColor
 
 @Composable
 fun LibraryScreen(
-    onScan: () -> Unit,
-    onAddByHand: () -> Unit,
+    onScan: (Shelf) -> Unit,
+    onAddByHand: (Shelf) -> Unit,
     onOpen: (Long) -> Unit,
 ) {
     val repo = rememberRepository()
     val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(repo) } })
     val state by vm.state.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    val export = rememberExporter(repo, snackbar)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             if (state.totalCount > 0) {
                 ExtendedFloatingActionButton(
-                    onClick = onScan,
+                    onClick = { onScan(state.shelf) },
                     icon = { Icon(Icons.Rounded.QrCodeScanner, contentDescription = null) },
                     text = { Text(stringResource(R.string.scan_a_book), style = MaterialTheme.typography.labelLarge) },
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -100,10 +125,15 @@ fun LibraryScreen(
                 bottom = padding.calculateBottomPadding() + 112.dp,
             ),
         ) {
-            item(key = "header") { LibraryHeader(state, onAddByHand) }
+            item(key = "header") {
+                LibraryHeader(state, onAddByHand = { onAddByHand(state.shelf) }, onExport = export)
+            }
             if (state.totalCount > 0) {
+                item(key = "shelves") {
+                    ShelfTabs(state, vm::setShelf, Modifier.padding(top = 20.dp))
+                }
                 item(key = "search") {
-                    SearchField(query, vm::setQuery, Modifier.padding(top = 20.dp))
+                    SearchField(query, vm::setQuery, Modifier.padding(top = 12.dp))
                 }
                 item(key = "sort") {
                     SortRow(state.sort, vm::setSort, Modifier.padding(top = 12.dp, bottom = 8.dp))
@@ -111,7 +141,10 @@ fun LibraryScreen(
             }
             when {
                 !state.loaded -> Unit
-                state.totalCount == 0 -> item(key = "empty") { EmptyLibrary(onScan, onAddByHand) }
+                state.totalCount == 0 -> item(key = "empty") {
+                    EmptyLibrary(onScan = { onScan(Shelf.Read) }, onAddByHand = { onAddByHand(Shelf.Read) })
+                }
+                state.books.isEmpty() && query.isBlank() -> item(key = "emptyShelf") { EmptyShelf(state.shelf) }
                 state.books.isEmpty() -> item(key = "none") { NoResults(query) }
                 else -> items(state.books, key = { it.id }) { book ->
                     Column(Modifier.animateItem()) {
@@ -128,7 +161,7 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryHeader(state: LibraryState, onAddByHand: () -> Unit) {
+private fun LibraryHeader(state: LibraryState, onAddByHand: () -> Unit, onExport: (ExportFormat) -> Unit) {
     Row(verticalAlignment = Alignment.Top) {
         Column(Modifier.weight(1f)) {
             Text(
@@ -145,7 +178,7 @@ private fun LibraryHeader(state: LibraryState, onAddByHand: () -> Unit) {
                 )
             }
         }
-        LanguageButton(Modifier.padding(top = 2.dp))
+        LibraryMenu(canExport = state.totalCount > 0, onExport = onExport, modifier = Modifier.padding(top = 2.dp))
         if (state.totalCount > 0) {
             Spacer(Modifier.width(8.dp))
             FilledTonalIconButton(onClick = onAddByHand, modifier = Modifier.padding(top = 2.dp)) {
@@ -157,7 +190,8 @@ private fun LibraryHeader(state: LibraryState, onAddByHand: () -> Unit) {
 
 @Composable
 private fun summaryLine(s: LibraryState): String {
-    val books = pluralStringResource(R.plurals.books_read, s.totalCount, s.totalCount)
+    val read = s.shelfCounts[Shelf.Read] ?: 0
+    val books = pluralStringResource(R.plurals.books_read, read, read)
     return s.averageRating?.let { stringResource(R.string.books_read_with_average, books, it) } ?: books
 }
 
@@ -239,7 +273,7 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             if (book.rating > 0) {
                 RatingBar(book.rating, starSize = 17.dp, spacing = 1.dp)
-            } else {
+            } else if (book.shelf == Shelf.Read) {
                 Text(
                     stringResource(R.string.not_rated),
                     style = MaterialTheme.typography.labelMedium,
@@ -327,6 +361,114 @@ private fun StackOfBooks() {
                 .background(LocalStarColor.current, RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp)),
         )
     }
+}
+
+/** Export and language, behind the ⋮ button. */
+@Composable
+private fun LibraryMenu(canExport: Boolean, onExport: (ExportFormat) -> Unit, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        IconButton(onClick = { open = true }) {
+            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (canExport) {
+                Text(
+                    stringResource(R.string.export_library),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+                ExportFormat.entries.forEach { format ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(stringResource(if (format == ExportFormat.Csv) R.string.export_csv else R.string.export_json))
+                        },
+                        leadingIcon = { Icon(Icons.Rounded.FileDownload, contentDescription = null) },
+                        onClick = {
+                            open = false
+                            onExport(format)
+                        },
+                    )
+                }
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            }
+            LanguageMenuItems(onChosen = { open = false })
+        }
+    }
+}
+
+/**
+ * Asks where to save the export (Downloads, Drive, …), writes it, and reports the
+ * result in [snackbar]. Returns the function to start an export.
+ */
+@Composable
+private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState): (ExportFormat) -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    fun saveTo(format: ExportFormat, uri: Uri?) {
+        if (uri == null) return
+        scope.launch {
+            val message = try {
+                val out = context.contentResolver.openOutputStream(uri) ?: throw IOException("No output stream")
+                val count = repo.export(format, out)
+                context.resources.getQuantityString(R.plurals.export_done, count, count)
+            } catch (e: IOException) {
+                context.getString(R.string.export_failed)
+            } catch (e: SecurityException) {
+                context.getString(R.string.export_failed)
+            }
+            snackbar.showSnackbar(message)
+        }
+    }
+
+    val csv = rememberLauncherForActivityResult(CreateDocument(ExportFormat.Csv.mimeType)) { saveTo(ExportFormat.Csv, it) }
+    val json = rememberLauncherForActivityResult(CreateDocument(ExportFormat.Json.mimeType)) { saveTo(ExportFormat.Json, it) }
+    return { format ->
+        val launcher = if (format == ExportFormat.Csv) csv else json
+        launcher.launch(LibraryExport.fileName(format))
+    }
+}
+
+@Composable
+private fun ShelfTabs(state: LibraryState, onChange: (Shelf) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ShelfOrder.forEach { shelf ->
+            FilterChip(
+                selected = shelf == state.shelf,
+                onClick = { onChange(shelf) },
+                label = {
+                    Text(
+                        stringResource(R.string.shelf_with_count, stringResource(shelf.label), state.shelfCounts[shelf] ?: 0),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyShelf(shelf: Shelf) {
+    Text(
+        stringResource(
+            when (shelf) {
+                Shelf.Read -> R.string.empty_shelf_read
+                Shelf.Reading -> R.string.empty_shelf_reading
+                Shelf.WantToRead -> R.string.empty_shelf_want
+            },
+        ),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 48.dp, start = 12.dp, end = 12.dp),
+    )
 }
 
 @Composable
