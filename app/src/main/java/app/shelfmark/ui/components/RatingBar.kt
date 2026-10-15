@@ -1,0 +1,82 @@
+package app.shelfmark.ui.components
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarOutline
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import app.shelfmark.ui.theme.LocalStarColor
+
+/**
+ * Five stars. Pass [onRatingChange] to make it interactive; tapping the
+ * current rating again clears it.
+ */
+@Composable
+fun RatingBar(
+    rating: Int,
+    modifier: Modifier = Modifier,
+    starSize: Dp = 18.dp,
+    spacing: Dp = 2.dp,
+    onRatingChange: ((Int) -> Unit)? = null,
+) {
+    val starColor = LocalStarColor.current
+    val emptyColor = MaterialTheme.colorScheme.outline
+    val a11y = if (onRatingChange == null) {
+        Modifier.semantics(mergeDescendants = true) { contentDescription = "Rated $rating out of 5" }
+    } else {
+        Modifier
+    }
+    Row(modifier.then(a11y), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+        for (i in 1..5) {
+            val filled = i <= rating
+            val scale by animateFloatAsState(
+                targetValue = if (filled) 1f else 0.9f,
+                animationSpec = spring(dampingRatio = 0.45f, stiffness = 500f),
+                label = "star$i",
+            )
+            val tap = if (onRatingChange != null) {
+                Modifier
+                    .clip(CircleShape)
+                    .clickable(onClickLabel = "Rate $i out of 5") {
+                        onRatingChange(if (rating == i) 0 else i)
+                    }
+            } else {
+                Modifier
+            }
+            Icon(
+                imageVector = if (filled) Icons.Rounded.Star else Icons.Rounded.StarOutline,
+                contentDescription = if (onRatingChange != null) "$i star${if (i > 1) "s" else ""}" else null,
+                tint = if (filled) starColor else emptyColor,
+                modifier = Modifier
+                    .size(starSize)
+                    .then(tap)
+                    .graphicsLayer { scaleX = scale; scaleY = scale },
+            )
+        }
+    }
+}
+
+fun ratingLabel(rating: Int): String = when (rating) {
+    1 -> "Didn't like it"
+    2 -> "It was okay"
+    3 -> "Liked it"
+    4 -> "Really liked it"
+    5 -> "Loved it"
+    else -> "Tap a star to rate"
+}
