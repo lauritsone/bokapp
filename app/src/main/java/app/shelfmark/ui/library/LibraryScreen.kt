@@ -1,5 +1,14 @@
 package app.shelfmark.ui.library
 
+import app.shelfmark.ui.components.icon
+import app.shelfmark.ui.components.colors
+import app.shelfmark.ui.components.ShelfBadge
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
 import kotlinx.coroutines.launch
 import java.io.IOException
 import app.shelfmark.ui.components.label
@@ -271,14 +280,18 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(8.dp))
-            if (book.rating > 0) {
-                RatingBar(book.rating, starSize = 17.dp, spacing = 1.dp)
-            } else if (book.shelf == Shelf.Read) {
-                Text(
-                    stringResource(R.string.not_rated),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ShelfBadge(book.shelf)
+                Spacer(Modifier.width(10.dp))
+                if (book.rating > 0) {
+                    RatingBar(book.rating, starSize = 17.dp, spacing = 1.dp)
+                } else if (book.shelf == Shelf.Read) {
+                    Text(
+                        stringResource(R.string.not_rated),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
             }
             if (book.notes.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
@@ -431,20 +444,46 @@ private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState):
     }
 }
 
+/** One tab per shelf, each with its icon, colour and number of books. */
 @Composable
 private fun ShelfTabs(state: LibraryState, onChange: (Shelf) -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val selectedIndex = ShelfOrder.indexOf(state.shelf)
+    val selectedColors = state.shelf.colors()
+    TabRow(
+        selectedTabIndex = selectedIndex,
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        indicator = { positions ->
+            TabRowDefaults.SecondaryIndicator(
+                Modifier.tabIndicatorOffset(positions[selectedIndex]),
+                height = 3.dp,
+                color = selectedColors.content,
+            )
+        },
     ) {
         ShelfOrder.forEach { shelf ->
-            FilterChip(
+            val colors = shelf.colors()
+            val count = state.shelfCounts[shelf] ?: 0
+            Tab(
                 selected = shelf == state.shelf,
                 onClick = { onChange(shelf) },
-                label = {
+                selectedContentColor = colors.content,
+                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                icon = {
+                    BadgedBox(
+                        badge = {
+                            if (count > 0) {
+                                Badge(containerColor = colors.container, contentColor = colors.content) { Text("$count") }
+                            }
+                        },
+                    ) { Icon(shelf.icon, contentDescription = null) }
+                },
+                text = {
                     Text(
-                        stringResource(R.string.shelf_with_count, stringResource(shelf.label), state.shelfCounts[shelf] ?: 0),
+                        stringResource(shelf.label),
                         style = MaterialTheme.typography.labelLarge,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
                     )
                 },
             )

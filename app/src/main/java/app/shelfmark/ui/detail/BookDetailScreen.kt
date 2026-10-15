@@ -3,6 +3,7 @@ package app.shelfmark.ui.detail
 import androidx.compose.ui.platform.LocalConfiguration
 import app.shelfmark.R
 import app.shelfmark.data.Shelf
+import app.shelfmark.ui.components.ShelfBadge
 import app.shelfmark.ui.components.ShelfSelector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.animateContentSize
@@ -180,7 +181,10 @@ private fun DetailContent(
             )
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(12.dp))
+        ShelfBadge(book.shelf, Modifier.align(Alignment.CenterHorizontally))
+
+        Spacer(Modifier.height(20.dp))
         ShelfSelector(book.shelf, onShelf)
 
         Spacer(Modifier.height(16.dp))
