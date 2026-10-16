@@ -68,3 +68,4 @@ Kotlin 2.0, Jetpack Compose with Material 3, Room, CameraX 1.4, ML Kit Barcode S
 
 - A finished date and a yearly reading goal
 - Google Books API key in `BookLookup` if you hit the anonymous quota
+- Let the user exclude books from the taste profile behind new-release suggestions, so one-off reads in an unusual genre don't skew the match scores (e.g. an "Ignore for suggestions" toggle on the book page)
