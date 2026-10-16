@@ -13,6 +13,7 @@ Everything is stored on the phone.
 - **Your notes**: a serif writing area for thoughts, quotes and recommendations. Notes are searchable.
 - **Library**: search by title, author, ISBN or notes. Sort by recently added, highest rated, title or author.
 - **Finishing a book**: books on *Reading* have a *Finished* button, in the list and on the book's page. It moves the book to *Read*, records the date, and asks for a rating and your thoughts (or skip and add them later). Books not yet finished don't ask for stars or notes.
+- **Leaving books out of suggestions**: a *Use for new-book suggestions* switch on each book's page. Turn it off for one-off reads outside your usual taste and the book no longer shapes the match scores; it's marked *Left out of suggestions* in the library, and the new-releases page says how many are left out. The setting is kept in exports and imports.
 - **Shelves**: keep books under *Read*, *Reading* or *Want to read*. Switch shelves in the library; a book scanned from a shelf lands on it, and you can move it from the book's page.
 - **Export**: save the whole library as a spreadsheet (CSV, opens in Excel or Google Sheets, with cover links) or a JSON backup, to Downloads, Drive or anywhere else.
 - **Import**: add books from a Shelfmark JSON backup or a CSV file: Shelfmark's own export, a spreadsheet (comma or semicolon separated) with a title column, or a Goodreads library export. Books already in the library are skipped.
@@ -69,4 +70,3 @@ Kotlin 2.0, Jetpack Compose with Material 3, Room, CameraX 1.4, ML Kit Barcode S
 
 - A yearly reading goal, using the finished dates
 - Google Books API key in `BookLookup` if you hit the anonymous quota
-- Let the user exclude books from the taste profile behind new-release suggestions, so one-off reads in an unusual genre don't skew the match scores (e.g. an "Ignore for suggestions" toggle on the book page)

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -38,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -50,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -114,6 +117,7 @@ fun BookDetailScreen(
                 onShelf = vm::setShelf,
                 onFinish = vm::finish,
                 onSaveNotes = vm::saveNotes,
+                onUseForSuggestions = vm::setUseForSuggestions,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -153,6 +157,7 @@ private fun DetailContent(
     onShelf: (Shelf) -> Unit,
     onFinish: () -> Unit,
     onSaveNotes: (String) -> Unit,
+    onUseForSuggestions: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -260,6 +265,35 @@ private fun DetailContent(
                 }
             }
         }
+
+        Spacer(Modifier.height(28.dp))
+        SuggestionsToggle(use = !book.ignoreForSuggestions, onChange = onUseForSuggestions)
+    }
+}
+
+/** Lets a one-off read be left out of the taste behind new-release suggestions. */
+@Composable
+private fun SuggestionsToggle(use: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .toggleable(value = use, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.use_for_suggestions), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.use_for_suggestions_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Switch(checked = use, onCheckedChange = null)
     }
 }
 

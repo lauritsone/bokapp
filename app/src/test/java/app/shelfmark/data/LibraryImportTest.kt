@@ -1,6 +1,7 @@
 package app.shelfmark.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,7 +16,7 @@ class LibraryImportTest {
             publishedDate = "2017", pageCount = 445, addedAt = 1_700_000_000_000, finishedAt = 1_700_500_000_000,
             coverUrl = "https://www.nb.no/services/image/resolver/URN:NBN:no-nb_digibok_2023071907012_C1/full/0,200/0/native.jpg",
         ),
-        Book(title = "Pippi Långstrump", authors = "Astrid Lindgren", shelf = Shelf.WantToRead),
+        Book(title = "Pippi Långstrump", authors = "Astrid Lindgren", shelf = Shelf.WantToRead, ignoreForSuggestions = true),
         Book(title = "Pride and Prejudice", authors = "Jane Austen", shelf = Shelf.Reading, publisher = "Penguin, UK"),
     )
 
@@ -39,6 +40,8 @@ class LibraryImportTest {
         assertEquals(445, sno.pageCount)
         assertEquals(books[0].coverUrl, sno.coverUrl)
         assertEquals(Shelf.WantToRead, imported[1].shelf)
+        assertTrue(imported[1].ignoreForSuggestions)
+        assertFalse(sno.ignoreForSuggestions)
         assertEquals(Shelf.Reading, imported[2].shelf)
         assertEquals("Penguin, UK", imported[2].publisher)
         assertNull(imported[2].finishedAt)

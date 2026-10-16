@@ -191,4 +191,13 @@
     <string name="finished_on">Ferdig lest</string>
     <string name="rate_when_finished">Du kan gi stjerner og skrive hva du synes når du er ferdig med den.</string>
     <string name="moved_to_read">«%1$s» er flyttet til Lest</string>
+
+    <!-- Holde bøker utenfor forslag til nye bøker -->
+    <string name="use_for_suggestions">Bruk i forslag til nye bøker</string>
+    <string name="use_for_suggestions_hint">Slå av for engangslesing utenfor vanlig smak, så de ikke påvirker treffprosentene.</string>
+    <string name="left_out_of_suggestions">Holdt utenfor forslag</string>
+    <plurals name="releases_ignored">
+        <item quantity="one">%1$d bok er holdt utenfor forslagene.</item>
+        <item quantity="other">%1$d bøker er holdt utenfor forslagene.</item>
+    </plurals>
 </resources>

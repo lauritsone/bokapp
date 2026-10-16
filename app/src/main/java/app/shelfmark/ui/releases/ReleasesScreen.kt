@@ -185,6 +185,14 @@ private fun ReleaseList(state: ReleasesState.Loaded, onOpen: (Match) -> Unit) {
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+                if (state.result.ignored > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        pluralStringResource(R.plurals.releases_ignored, state.result.ignored, state.result.ignored),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LanguageFilter.entries.forEach { f ->

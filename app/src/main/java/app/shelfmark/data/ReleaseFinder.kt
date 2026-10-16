@@ -17,7 +17,8 @@ sealed interface ReleaseProgress {
     data class ReadingDetails(val done: Int, val total: Int) : ReleaseProgress
 }
 
-data class ReleaseResult(val matches: List<Match>, val profileSize: Int)
+/** [ignored] is how many books the user left out of the taste profile. */
+data class ReleaseResult(val matches: List<Match>, val profileSize: Int, val ignored: Int = 0)
 
 /**
  * Finds new books: Norwegian ones in the National Library's catalogue (recent books by
@@ -95,12 +96,12 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         // bibliography shows which titles they published before.
         val scored = candidates.map(profile::score).sortedByDescending { it.percent }
         val matches = concurrently(scored) { match -> match.takeUnless { isReissue(it.candidate, year) } }.filterNotNull()
-        return ReleaseResult(matches, profile.bookCount)
+        return ReleaseResult(matches, profile.bookCount, library.count { it.ignoreForSuggestions })
     }
 
     /** Looks up genres for library books that don't have them yet, a batch at a time. */
     private suspend fun learnGenres(onProgress: (ReleaseProgress) -> Unit) {
-        val pending = dao.getAll().filter { it.profiledAt < Genres.RULES_SINCE }.take(40)
+        val pending = dao.getAll().filter { !it.ignoreForSuggestions && it.profiledAt < Genres.RULES_SINCE }.take(40)
         if (pending.isEmpty()) return
         val done = AtomicInteger()
         onProgress(ReleaseProgress.LearningTaste(0, pending.size))

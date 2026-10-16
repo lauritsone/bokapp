@@ -132,6 +132,13 @@ class BookRepository(
     suspend fun setShelf(id: Long, shelf: Shelf) =
         dao.setShelf(id, shelf, System.currentTimeMillis())
 
+    /** Leaves the book out of (or back in) the taste behind new-release suggestions. */
+    suspend fun setIgnoreForSuggestions(id: Long, ignore: Boolean) {
+        dao.setIgnoreForSuggestions(id, ignore, System.currentTimeMillis())
+        // The scores change, so the next visit to the new-releases page searches again.
+        lastReleases = null
+    }
+
     /** Moves the book to Read and records today as the day it was finished. */
     suspend fun finish(id: Long) = setShelf(id, Shelf.Read)
 

@@ -32,6 +32,8 @@ data class Book(
     @ColumnInfo(defaultValue = "0") val coverCheckedAt: Long = 0,
     /** When the book was marked as finished; null if unknown or not finished. */
     val finishedAt: Long? = null,
+    /** Left out of the taste profile behind new-release suggestions (a one-off read, a gift …). */
+    @ColumnInfo(defaultValue = "0") val ignoreForSuggestions: Boolean = false,
     val addedAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

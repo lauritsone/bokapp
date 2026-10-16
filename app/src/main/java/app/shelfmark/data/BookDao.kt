@@ -43,6 +43,9 @@ interface BookDao {
     )
     suspend fun setShelf(id: Long, shelf: Shelf, now: Long)
 
+    @Query("UPDATE books SET ignoreForSuggestions = :ignore, updatedAt = :now WHERE id = :id")
+    suspend fun setIgnoreForSuggestions(id: Long, ignore: Boolean, now: Long)
+
     @Query("UPDATE books SET genres = :genres, profiledAt = :now WHERE id = :id")
     suspend fun setGenres(id: Long, genres: String?, now: Long)
 

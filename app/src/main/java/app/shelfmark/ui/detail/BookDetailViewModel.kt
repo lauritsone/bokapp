@@ -45,6 +45,10 @@ class BookDetailViewModel(
         _askForReview.value = false
     }
 
+    fun setUseForSuggestions(use: Boolean) {
+        viewModelScope.launch { repo.setIgnoreForSuggestions(id, !use) }
+    }
+
     fun saveNotes(notes: String) {
         viewModelScope.launch { repo.setNotes(id, notes) }
     }

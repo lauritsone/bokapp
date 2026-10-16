@@ -29,7 +29,7 @@ object LibraryExport {
     private fun writeCsv(books: List<Book>, out: OutputStream) {
         val header = listOf(
             "title", "authors", "shelf", "rating", "notes", "isbn",
-            "publisher", "published", "pages", "added", "updated", "cover_url", "finished",
+            "publisher", "published", "pages", "added", "updated", "cover_url", "finished", "ignore_for_suggestions",
         )
         val writer = out.bufferedWriter(Charsets.UTF_8)
         // The byte-order mark makes Excel read æ, ø and å correctly.
@@ -39,7 +39,7 @@ object LibraryExport {
             val row = listOf(
                 b.title, b.authors, b.shelf.key, b.rating.takeIf { it > 0 }?.toString(), b.notes, b.isbn,
                 b.publisher, b.publishedDate, b.pageCount?.toString(), localDate(b.addedAt), localDate(b.updatedAt), b.coverUrl,
-                b.finishedAt?.let(::localDate),
+                b.finishedAt?.let(::localDate), if (b.ignoreForSuggestions) "yes" else null,
             )
             writer.write(row.joinToString(",") { csvField(it.orEmpty()) } + "\r\n")
         }
@@ -64,7 +64,8 @@ object LibraryExport {
                     .putOpt("coverUrl", b.coverUrl)
                     .put("addedAt", Instant.ofEpochMilli(b.addedAt).toString())
                     .put("updatedAt", Instant.ofEpochMilli(b.updatedAt).toString())
-                    .putOpt("finishedAt", b.finishedAt?.let { Instant.ofEpochMilli(it).toString() }),
+                    .putOpt("finishedAt", b.finishedAt?.let { Instant.ofEpochMilli(it).toString() })
+                    .put("ignoreForSuggestions", b.ignoreForSuggestions),
             )
         }
         val root = JSONObject()

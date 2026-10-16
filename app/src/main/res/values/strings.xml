@@ -196,4 +196,13 @@
     <string name="finished_on">Finished</string>
     <string name="rate_when_finished">You can rate it and write your thoughts when you finish it.</string>
     <string name="moved_to_read">Moved “%1$s” to Read</string>
+
+    <!-- Leaving books out of new-release suggestions -->
+    <string name="use_for_suggestions">Use for new-book suggestions</string>
+    <string name="use_for_suggestions_hint">Turn off for one-off reads outside your usual taste, so they don’t steer the match scores.</string>
+    <string name="left_out_of_suggestions">Left out of suggestions</string>
+    <plurals name="releases_ignored">
+        <item quantity="one">%1$d book is left out of the suggestions.</item>
+        <item quantity="other">%1$d books are left out of the suggestions.</item>
+    </plurals>
 </resources>

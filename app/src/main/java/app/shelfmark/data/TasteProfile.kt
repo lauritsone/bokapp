@@ -42,6 +42,7 @@ class TasteProfile(books: List<Book>) {
     init {
         var counted = 0
         for (book in books) {
+            if (book.ignoreForSuggestions) continue
             val w = weight(book)
             if (w == 0.0) continue
             counted++

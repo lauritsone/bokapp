@@ -106,6 +106,20 @@ class ReleaseMatchingTest {
         assertTrue(r.knownFirstEdition)
     }
 
+    @Test fun booksLeftOutDontShapeTheProfile() {
+        val cookbookFan = library + List(3) { i ->
+            Book(title = "Bakebok $i", authors = "Ingrid Espelid", rating = 5, publisher = "Gyldendal",
+                genres = Genres.encode(setOf("cooking", Genres.NONFICTION)), ignoreForSuggestions = true)
+        }
+        val left = TasteProfile(cookbookFan)
+        assertEquals(profile.bookCount, left.bookCount)
+        assertFalse("Ingrid Espelid" in left.favouriteAuthors(10))
+        assertFalse("cooking" in left.topGenres(5))
+        val baking = candidate("Ingrid Espelid", "Gyldendal", listOf("Kokebøker"), false)
+        assertEquals(profile.score(baking).percent, left.score(baking).percent)
+        assertTrue(TasteProfile(cookbookFan.map { it.copy(ignoreForSuggestions = false) }).score(baking).percent > left.score(baking).percent)
+    }
+
     @Test fun picksAuthorsAndPublishersToSearch() {
         assertEquals("Jo Nesbø", profile.favouriteAuthors(3).first())
         assertFalse("Hellstrøm" in profile.favouriteAuthors(10))

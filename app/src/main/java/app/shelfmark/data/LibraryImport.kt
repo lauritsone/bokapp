@@ -58,6 +58,7 @@ object LibraryImport {
                 addedAt = parseTime(o.text("addedAt")) ?: now,
                 updatedAt = parseTime(o.text("updatedAt")) ?: now,
                 finishedAt = parseTime(o.text("finishedAt")),
+                ignoreForSuggestions = o.optBoolean("ignoreForSuggestions"),
             )
         }
     }
@@ -86,6 +87,7 @@ object LibraryImport {
         "added" to listOf("added", "addedat", "dateadded", "lagttil"),
         "updated" to listOf("updated", "updatedat"),
         "finished" to listOf("finished", "finishedat", "dateread", "ferdig", "fullfort"),
+        "ignore" to listOf("ignoreforsuggestions", "ignore", "ikkeiforslag"),
     )
 
     private fun columnKey(name: String) = foldText(name).replace(" ", "")
@@ -119,6 +121,7 @@ object LibraryImport {
                 addedAt = parseTime(cell("added")) ?: now,
                 updatedAt = parseTime(cell("updated")) ?: now,
                 finishedAt = parseTime(cell("finished")),
+                ignoreForSuggestions = parseYes(cell("ignore")),
             )
         }
     }
@@ -169,6 +172,9 @@ object LibraryImport {
     }
 
     /** Goodreads writes ISBNs as ="9788203362446"; keep only the digits (and X). */
+    private fun parseYes(value: String?): Boolean =
+        value?.let { foldText(it) } in setOf("yes", "true", "1", "ja", "x")
+
     private fun cleanIsbn(value: String?): String? {
         val raw = value?.filter { it.isDigit() || it == 'X' || it == 'x' }?.ifEmpty { null } ?: return null
         return Isbn.normalize(raw) ?: raw

@@ -339,6 +339,14 @@ private fun BookRow(book: Book, onClick: () -> Unit, onFinish: () -> Unit) {
                     )
                 }
             }
+            if (book.ignoreForSuggestions) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.left_out_of_suggestions),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
             if (book.shelf == Shelf.Reading) {
                 Spacer(Modifier.height(10.dp))
                 FinishButton(onFinish)
