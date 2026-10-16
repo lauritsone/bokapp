@@ -189,4 +189,11 @@
     <string name="lang_all">All</string>
     <string name="lang_norwegian">Norwegian</string>
     <string name="lang_english">English</string>
+    <string name="mark_finished">Finished</string>
+    <string name="finished_title">You finished it!</string>
+    <string name="skip_for_now">Skip for now</string>
+    <string name="save">Save</string>
+    <string name="finished_on">Finished</string>
+    <string name="rate_when_finished">You can rate it and write your thoughts when you finish it.</string>
+    <string name="moved_to_read">Moved “%1$s” to Read</string>
 </resources>

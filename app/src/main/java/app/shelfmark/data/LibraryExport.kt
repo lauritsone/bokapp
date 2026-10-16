@@ -29,7 +29,7 @@ object LibraryExport {
     private fun writeCsv(books: List<Book>, out: OutputStream) {
         val header = listOf(
             "title", "authors", "shelf", "rating", "notes", "isbn",
-            "publisher", "published", "pages", "added", "updated", "cover_url",
+            "publisher", "published", "pages", "added", "updated", "cover_url", "finished",
         )
         val writer = out.bufferedWriter(Charsets.UTF_8)
         // The byte-order mark makes Excel read æ, ø and å correctly.
@@ -39,6 +39,7 @@ object LibraryExport {
             val row = listOf(
                 b.title, b.authors, b.shelf.key, b.rating.takeIf { it > 0 }?.toString(), b.notes, b.isbn,
                 b.publisher, b.publishedDate, b.pageCount?.toString(), localDate(b.addedAt), localDate(b.updatedAt), b.coverUrl,
+                b.finishedAt?.let(::localDate),
             )
             writer.write(row.joinToString(",") { csvField(it.orEmpty()) } + "\r\n")
         }
@@ -62,7 +63,8 @@ object LibraryExport {
                     .putOpt("description", b.description)
                     .putOpt("coverUrl", b.coverUrl)
                     .put("addedAt", Instant.ofEpochMilli(b.addedAt).toString())
-                    .put("updatedAt", Instant.ofEpochMilli(b.updatedAt).toString()),
+                    .put("updatedAt", Instant.ofEpochMilli(b.updatedAt).toString())
+                    .putOpt("finishedAt", b.finishedAt?.let { Instant.ofEpochMilli(it).toString() }),
             )
         }
         val root = JSONObject()

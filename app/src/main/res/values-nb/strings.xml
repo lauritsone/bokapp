@@ -184,4 +184,11 @@
     <string name="lang_all">Alle</string>
     <string name="lang_norwegian">Norsk</string>
     <string name="lang_english">Engelsk</string>
+    <string name="mark_finished">Ferdig</string>
+    <string name="finished_title">Du er ferdig!</string>
+    <string name="skip_for_now">Hopp over</string>
+    <string name="save">Lagre</string>
+    <string name="finished_on">Ferdig lest</string>
+    <string name="rate_when_finished">Du kan gi stjerner og skrive hva du synes når du er ferdig med den.</string>
+    <string name="moved_to_read">«%1$s» er flyttet til Lest</string>
 </resources>

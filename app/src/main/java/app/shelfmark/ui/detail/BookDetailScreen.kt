@@ -61,6 +61,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.data.Book
 import app.shelfmark.data.coverModel
 import app.shelfmark.ui.components.BookCover
+import app.shelfmark.ui.components.FinishButton
+import app.shelfmark.ui.components.FinishSheet
 import app.shelfmark.ui.components.RatingBar
 import app.shelfmark.ui.components.formatDate
 import app.shelfmark.ui.components.ratingLabel
@@ -77,6 +79,7 @@ fun BookDetailScreen(
     val repo = rememberRepository()
     val vm: BookDetailViewModel = viewModel(factory = viewModelFactory { initializer { BookDetailViewModel(repo, bookId) } })
     val book by vm.book.collectAsStateWithLifecycle()
+    val askForReview by vm.askForReview.collectAsStateWithLifecycle()
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
@@ -109,6 +112,7 @@ fun BookDetailScreen(
                 book = current,
                 onRate = vm::setRating,
                 onShelf = vm::setShelf,
+                onFinish = vm::finish,
                 onSaveNotes = vm::saveNotes,
                 modifier = Modifier.padding(padding),
             )
@@ -116,6 +120,9 @@ fun BookDetailScreen(
     }
 
     val current = book
+    if (askForReview && current != null) {
+        FinishSheet(current, onSave = vm::review, onSkip = vm::skipReview)
+    }
     if (confirmDelete && current != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -144,6 +151,7 @@ private fun DetailContent(
     book: Book,
     onRate: (Int) -> Unit,
     onShelf: (Shelf) -> Unit,
+    onFinish: () -> Unit,
     onSaveNotes: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -188,25 +196,42 @@ private fun DetailContent(
         ShelfSelector(book.shelf, onShelf)
 
         Spacer(Modifier.height(16.dp))
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            RatingBar(rating = book.rating, starSize = 44.dp, spacing = 4.dp, onRatingChange = onRate)
-            Spacer(Modifier.height(6.dp))
+        if (book.shelf == Shelf.Read) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .padding(vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                RatingBar(rating = book.rating, starSize = 44.dp, spacing = 4.dp, onRatingChange = onRate)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    ratingLabel(book.rating),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            if (book.shelf == Shelf.Reading) {
+                FinishButton(onFinish, large = true)
+                Spacer(Modifier.height(10.dp))
+            }
             Text(
-                ratingLabel(book.rating),
-                style = MaterialTheme.typography.bodyLarge,
+                stringResource(R.string.rate_when_finished),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
-        Spacer(Modifier.height(36.dp))
-        NotesSection(book.notes, onSaveNotes)
+        // Notes written before the book went back to another shelf stay visible.
+        if (book.shelf == Shelf.Read || book.notes.isNotBlank()) {
+            Spacer(Modifier.height(36.dp))
+            NotesSection(book.notes, onSaveNotes)
+        }
 
         book.description?.let { DescriptionSection(it) }
 
@@ -217,6 +242,7 @@ private fun DetailContent(
             book.pageCount?.let { add(R.string.pages to it.toString()) }
             book.isbn?.let { add(R.string.isbn to it) }
             add(R.string.added to formatDate(book.addedAt, locale))
+            book.finishedAt?.let { add(R.string.finished_on to formatDate(it, locale)) }
         }
         Spacer(Modifier.height(36.dp))
         Text(stringResource(R.string.details), style = MaterialTheme.typography.titleLarge)

@@ -6,7 +6,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Book::class], version = 4, exportSchema = false)
+@Database(entities = [Book::class], version = 5, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
@@ -31,6 +31,13 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE books ADD COLUMN coverCheckedAt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Adds the date a book was finished. Books read before this have none. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN finishedAt INTEGER")
             }
         }
     }

@@ -98,6 +98,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.data.Book
 import app.shelfmark.data.coverModel
 import app.shelfmark.ui.components.BookCover
+import app.shelfmark.ui.components.FinishButton
+import app.shelfmark.ui.components.FinishSheet
 import app.shelfmark.ui.components.RatingBar
 import app.shelfmark.ui.components.rememberRepository
 import app.shelfmark.ui.theme.LocalStarColor
@@ -116,6 +118,21 @@ fun LibraryScreen(
     val snackbar = remember { SnackbarHostState() }
     val export = rememberExporter(repo, snackbar)
     val import = rememberImporter(repo, snackbar)
+    val justFinished by vm.justFinished.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val movedToRead = stringResource(R.string.moved_to_read, justFinished?.title.orEmpty())
+
+    justFinished?.let { book ->
+        fun done(review: () -> Unit) {
+            review()
+            scope.launch { snackbar.showSnackbar(movedToRead) }
+        }
+        FinishSheet(
+            book,
+            onSave = { rating, notes -> done { vm.review(rating, notes) } },
+            onSkip = { done(vm::skipReview) },
+        )
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -180,7 +197,7 @@ fun LibraryScreen(
                 state.books.isEmpty() -> item(key = "none") { NoResults(query) }
                 else -> items(state.books, key = { it.id }) { book ->
                     Column(Modifier.animateItem()) {
-                        BookRow(book, onClick = { onOpen(book.id) })
+                        BookRow(book, onClick = { onOpen(book.id) }, onFinish = { vm.finish(book) })
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 88.dp),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
@@ -278,7 +295,7 @@ private fun SortRow(sort: SortMode, onChange: (SortMode) -> Unit, modifier: Modi
 }
 
 @Composable
-private fun BookRow(book: Book, onClick: () -> Unit) {
+private fun BookRow(book: Book, onClick: () -> Unit, onFinish: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -311,7 +328,8 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ShelfBadge(book.shelf)
                 Spacer(Modifier.width(10.dp))
-                if (book.rating > 0) {
+                // Stars belong to finished books; the others get theirs when they are finished.
+                if (book.shelf == Shelf.Read && book.rating > 0) {
                     RatingBar(book.rating, starSize = 17.dp, spacing = 1.dp)
                 } else if (book.shelf == Shelf.Read) {
                     Text(
@@ -320,6 +338,10 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
                         color = MaterialTheme.colorScheme.outline,
                     )
                 }
+            }
+            if (book.shelf == Shelf.Reading) {
+                Spacer(Modifier.height(10.dp))
+                FinishButton(onFinish)
             }
             if (book.notes.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))

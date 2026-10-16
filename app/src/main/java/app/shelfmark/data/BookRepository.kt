@@ -115,7 +115,10 @@ class BookRepository(
 
     /** Inserts or updates; returns the book's id. */
     suspend fun save(book: Book): Long {
-        val rowId = dao.upsert(book.copy(updatedAt = System.currentTimeMillis()))
+        val now = System.currentTimeMillis()
+        val previousShelf = if (book.id == 0L) null else dao.get(book.id)?.shelf
+        val finished = previousShelf != null && previousShelf != Shelf.Read && book.shelf == Shelf.Read
+        val rowId = dao.upsert(book.copy(updatedAt = now, finishedAt = if (finished) now else book.finishedAt))
         if (book.photoPath == null && (book.coverUrl == null || CoverFinder.isGuess(book.coverUrl))) repairCovers()
         return if (book.id == 0L) rowId else book.id
     }
@@ -128,6 +131,14 @@ class BookRepository(
 
     suspend fun setShelf(id: Long, shelf: Shelf) =
         dao.setShelf(id, shelf, System.currentTimeMillis())
+
+    /** Moves the book to Read and records today as the day it was finished. */
+    suspend fun finish(id: Long) = setShelf(id, Shelf.Read)
+
+    suspend fun review(id: Long, rating: Int, notes: String) {
+        setRating(id, rating)
+        setNotes(id, notes.trim())
+    }
 
     /** Writes every book to [out] and returns how many were exported. */
     suspend fun export(format: ExportFormat, out: OutputStream): Int = withContext(Dispatchers.IO) {

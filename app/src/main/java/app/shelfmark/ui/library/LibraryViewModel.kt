@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 enum class SortMode(@StringRes val label: Int) {
     Recent(R.string.sort_recent),
@@ -36,7 +37,7 @@ data class LibraryState(
     val loaded: Boolean = false,
 )
 
-class LibraryViewModel(repo: BookRepository) : ViewModel() {
+class LibraryViewModel(private val repo: BookRepository) : ViewModel() {
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
     private val sort = MutableStateFlow(SortMode.Recent)
@@ -81,5 +82,25 @@ class LibraryViewModel(repo: BookRepository) : ViewModel() {
 
     fun setSort(s: SortMode) {
         sort.value = s
+    }
+
+    private val _justFinished = MutableStateFlow<Book?>(null)
+
+    /** A book that was just finished from the list, waiting for a rating and review. */
+    val justFinished: StateFlow<Book?> = _justFinished.asStateFlow()
+
+    fun finish(book: Book) {
+        _justFinished.value = book
+        viewModelScope.launch { repo.finish(book.id) }
+    }
+
+    fun review(rating: Int, notes: String) {
+        val book = _justFinished.value ?: return
+        _justFinished.value = null
+        viewModelScope.launch { repo.review(book.id, rating, notes) }
+    }
+
+    fun skipReview() {
+        _justFinished.value = null
     }
 }

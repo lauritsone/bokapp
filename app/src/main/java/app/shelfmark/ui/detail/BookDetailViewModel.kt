@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.Book
 import app.shelfmark.data.BookRepository
 import app.shelfmark.data.Shelf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -22,8 +24,25 @@ class BookDetailViewModel(
         viewModelScope.launch { repo.setRating(id, rating) }
     }
 
+    private val _askForReview = MutableStateFlow(false)
+
+    /** True right after the book was finished, to ask for a rating and review. */
+    val askForReview: StateFlow<Boolean> = _askForReview.asStateFlow()
+
     fun setShelf(shelf: Shelf) {
+        if (shelf == Shelf.Read && book.value?.shelf != Shelf.Read) _askForReview.value = true
         viewModelScope.launch { repo.setShelf(id, shelf) }
+    }
+
+    fun finish() = setShelf(Shelf.Read)
+
+    fun review(rating: Int, notes: String) {
+        _askForReview.value = false
+        viewModelScope.launch { repo.review(id, rating, notes) }
+    }
+
+    fun skipReview() {
+        _askForReview.value = false
     }
 
     fun saveNotes(notes: String) {

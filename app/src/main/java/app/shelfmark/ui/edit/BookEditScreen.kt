@@ -128,20 +128,28 @@ fun BookEditScreen(
                     }
                     Spacer(Modifier.width(20.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.your_rating), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(6.dp))
-                        RatingBar(
-                            rating = book.rating,
-                            starSize = 34.dp,
-                            spacing = 0.dp,
-                            onRatingChange = { r -> vm.update { it.copy(rating = r) } },
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            ratingLabel(book.rating),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (book.shelf == Shelf.Read) {
+                            Text(stringResource(R.string.your_rating), style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(6.dp))
+                            RatingBar(
+                                rating = book.rating,
+                                starSize = 34.dp,
+                                spacing = 0.dp,
+                                onRatingChange = { r -> vm.update { it.copy(rating = r) } },
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                ratingLabel(book.rating),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Text(
+                                stringResource(R.string.rate_when_finished),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
 
@@ -231,7 +239,7 @@ fun BookEditScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
                     }
-                    OutlinedTextField(
+                    if (book.shelf == Shelf.Read || book.notes.isNotBlank()) OutlinedTextField(
                         value = book.notes,
                         onValueChange = { v -> vm.update { it.copy(notes = v) } },
                         label = { Text(stringResource(R.string.your_notes)) },

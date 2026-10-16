@@ -57,6 +57,7 @@ object LibraryImport {
                 coverUrl = o.text("coverUrl"),
                 addedAt = parseTime(o.text("addedAt")) ?: now,
                 updatedAt = parseTime(o.text("updatedAt")) ?: now,
+                finishedAt = parseTime(o.text("finishedAt")),
             )
         }
     }
@@ -84,6 +85,7 @@ object LibraryImport {
         "cover" to listOf("coverurl", "cover"),
         "added" to listOf("added", "addedat", "dateadded", "lagttil"),
         "updated" to listOf("updated", "updatedat"),
+        "finished" to listOf("finished", "finishedat", "dateread", "ferdig", "fullfort"),
     )
 
     private fun columnKey(name: String) = foldText(name).replace(" ", "")
@@ -116,6 +118,7 @@ object LibraryImport {
                 coverUrl = cell("cover"),
                 addedAt = parseTime(cell("added")) ?: now,
                 updatedAt = parseTime(cell("updated")) ?: now,
+                finishedAt = parseTime(cell("finished")),
             )
         }
     }

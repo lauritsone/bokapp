@@ -30,6 +30,8 @@ data class Book(
     @ColumnInfo(defaultValue = "0") val profiledAt: Long = 0,
     /** When a missing cover was last looked for; 0 = not yet. */
     @ColumnInfo(defaultValue = "0") val coverCheckedAt: Long = 0,
+    /** When the book was marked as finished; null if unknown or not finished. */
+    val finishedAt: Long? = null,
     val addedAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
