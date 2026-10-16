@@ -67,5 +67,6 @@ Kotlin 2.0, Jetpack Compose with Material 3, Room, CameraX 1.4, ML Kit Barcode S
 ## Ideas for next steps
 
 - A finished date and a yearly reading goal
+- Hide rating and review for books on the "Reading" shelf (and "Want to read"); add a "Finished" button on Reading books that moves the book to "Read", records the finished date, and then asks for rating and review
 - Google Books API key in `BookLookup` if you hit the anonymous quota
 - Let the user exclude books from the taste profile behind new-release suggestions, so one-off reads in an unusual genre don't skew the match scores (e.g. an "Ignore for suggestions" toggle on the book page)
