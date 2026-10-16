@@ -306,13 +306,20 @@ private fun reasonText(reason: MatchReason): String = when (reason) {
         genreNames[reason.tag]?.let { stringResource(it) } ?: reason.label,
         reason.books,
     )
+    // Subjects are catalogued in Norwegian with a capital ("Vennskap"); places keep theirs.
+    is MatchReason.Theme -> pluralStringResource(R.plurals.reason_theme, reason.books, reason.label.lowercaseUnlessName(), reason.books)
+    is MatchReason.Series -> stringResource(R.string.reason_series, reason.name)
     is MatchReason.Publisher -> stringResource(R.string.reason_publisher, reason.name)
 }
+
+private val placeNames = Regex("^(Oslo|Bergen|Trondheim|Stavanger|Paris|London|Norge|Sverige|Danmark|[A-ZÆØÅ][a-zæøå]+ (fylke|kommune))$")
+
+private fun String.lowercaseUnlessName() = if (placeNames.matches(this)) this else replaceFirstChar { it.lowercase() }
 
 /** Short names, in the app's language, for the shared genre tags. */
 private val genreNames = mapOf(
     "crime" to R.string.genre_crime, "fantasy" to R.string.genre_fantasy, "scifi" to R.string.genre_scifi,
-    "horror" to R.string.genre_horror, "romance" to R.string.genre_romance, "historical" to R.string.genre_historical,
+    "horror" to R.string.genre_horror, "romance" to R.string.genre_romance, "feelgood" to R.string.genre_feelgood, "historical" to R.string.genre_historical,
     "novel" to R.string.genre_novel, "shortstories" to R.string.genre_shortstories, "poetry" to R.string.genre_poetry,
     "children" to R.string.genre_children, "youngadult" to R.string.genre_youngadult, "biography" to R.string.genre_biography,
     "history" to R.string.genre_history, "essays" to R.string.genre_essays, "humor" to R.string.genre_humor,

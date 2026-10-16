@@ -17,7 +17,14 @@ Everything is stored on the phone.
 - **Shelves**: keep books under *Read*, *Reading* or *Want to read*. Switch shelves in the library; a book scanned from a shelf lands on it, and you can move it from the book's page.
 - **Export**: save the whole library as a spreadsheet (CSV, opens in Excel or Google Sheets, with cover links) or a JSON backup, to Downloads, Drive or anywhere else.
 - **Import**: add books from a Shelfmark JSON backup or a CSV file: Shelfmark's own export, a spreadsheet (comma or semicolon separated) with a title column, or a Goodreads library export. Books already in the library are skipped.
-- **New releases for you**: new Norwegian books from the National Library's catalogue (nb.no) by your authors and from your publishers, plus new English books from Open Library by your authors and the most-read new books in your genres. Each has a match percentage and the reasons behind it (authors you rated highly, genres you read, publishers). Reissues of older books are left out; filter by language, and add any of them to *Want to read* in one tap.
+- **New releases for you**: new Norwegian books from the National Library's catalogue (nb.no) by your authors, in your favourite genres and from your publishers, plus new English books from Open Library by your authors and the most-read new books in your genres. Each has a match percentage and the reasons behind it (authors you rated highly, genres and subjects you read, a series you follow, publishers). Weak matches, reissues of older books and children's books for adult readers are left out; filter by language, and add any of them to *Want to read* in one tap.
+- **How books are classified** for matching, from each book's catalogue record (MODS) at nb.no:
+  - *Genre* (Krim, Feelgood, Romantikk …), mapped to shared tags. "Romaner" alone says little, so it counts as half a match unless your own novels are mostly catalogued that way.
+  - *Subjects* (Vennskap, Sorg, Bakerier …) and *series* (recurring characters, "… (fiktiv person)").
+  - *Mood*: light, dark or serious, from the genre, the subjects and the blurb. A dark thriller ranks low for a feelgood reader even when both are novels.
+  - *Target audience*: adult or children/young adults.
+  - *Dewey number* ([Norsk WebDewey](https://bibliotekutvikling.no/kunnskapsorganisering/norsk-webdewey/)): for novels the literature it comes from (839.82 Norwegian, 823 English, 839.7 Swedish …), for non-fiction its subject class (641 food, 796 sport …).
+  - The ISBN only identifies country and publisher, not the kind of book, so it's used to find the record, not to judge it.
 - **Covers that fill themselves in**: books imported or added without a cover get one looked up in the background (NB.no, Open Library, Google Books), by ISBN or by title and author.
 - **English and Norwegian**: pick the language from the ⋮ menu, or follow the phone's language.
 - **Duplicate check**: scanning a book you've already logged takes you to its page.

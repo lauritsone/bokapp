@@ -155,6 +155,11 @@
         <item quantity="one">%1$s, som %2$d av bøkene dine</item>
         <item quantity="other">%1$s, som %2$d av bøkene dine</item>
     </plurals>
+    <plurals name="reason_theme">
+        <item quantity="one">Om %1$s, som %2$d av bøkene dine</item>
+        <item quantity="other">Om %1$s, som %2$d av bøkene dine</item>
+    </plurals>
+    <string name="reason_series">Med %1$s, som i en bok du har lest</string>
     <string name="reason_publisher">Fra %1$s, et forlag du leser</string>
     <string name="add_to_want">Legg i Vil lese</string>
     <string name="added_to_want">Lagt i Vil lese</string>
@@ -165,6 +170,7 @@
     <string name="genre_scifi">Science fiction</string>
     <string name="genre_horror">Grøsser</string>
     <string name="genre_romance">Romantikk</string>
+    <string name="genre_feelgood">Feelgood</string>
     <string name="genre_historical">Historiske romaner</string>
     <string name="genre_novel">Romaner</string>
     <string name="genre_shortstories">Noveller</string>

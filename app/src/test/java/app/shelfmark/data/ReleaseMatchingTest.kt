@@ -16,6 +16,33 @@ class ReleaseMatchingTest {
         assertEquals("nob", d.language)
         assertEquals("Ulrika Rolfsdotter", d.author)
         assertTrue(d.summary!!.startsWith("Det er midtsommer"))
+        assertEquals(listOf("Annie Ljung (fiktiv person)", "Ådalen"), d.topics.distinct())
+        assertEquals("adult", d.audience)
+        assertEquals("839.738", d.dewey)
+        val traits = Genres.traits(d)
+        assertTrue("series:annie ljung" in traits)
+        assertTrue("topic:adalen" in traits)
+        assertTrue(Genres.ADULT in traits)
+        assertTrue("lit:swedish" in traits)
+        assertTrue(Genres.DARK in traits)
+    }
+
+    @Test fun readsMoodAudienceAndDeweyFromRecords() {
+        fun traits(genres: List<String>, summary: String? = null, topics: List<String> = emptyList(), audience: String? = null, dewey: String? = null) =
+            Genres.traits(NbDetails(genres, null, "nob", summary, null, topics, audience, dewey))
+        assertTrue(Genres.LIGHT in traits(listOf("Feelgood", "Romaner")))
+        assertTrue(Genres.LIGHT in traits(listOf("Romaner"), "En hjertevarm og morsom roman om et lite bakeri."))
+        assertTrue(Genres.DARK in traits(listOf("Romaner"), "Et brutalt drap ryster bygda."))
+        assertTrue(Genres.SERIOUS in traits(listOf("Romaner"), topics = listOf("Døden", "Sorg")))
+        // A feelgood novel may deal with grief; the genre decides the mood.
+        assertFalse(Genres.SERIOUS in traits(listOf("Feelgood"), topics = listOf("Sorg")))
+        assertTrue(Genres.JUVENILE in traits(listOf("Fantasy", "Romaner"), audience = "juvenile"))
+        assertTrue(Genres.JUVENILE in traits(listOf("Bildebøker")))
+        assertTrue("lit:norwegian" in traits(listOf("Romaner"), dewey = "839.8238"))
+        assertTrue("lit:english" in traits(listOf("Romaner"), dewey = "823.92"))
+        assertTrue("dewey:641" in traits(emptyList(), dewey = "641.5"))
+        assertFalse(Genres.isGenre("topic:vennskap"))
+        assertTrue(Genres.isGenre("dewey:641"))
     }
 
     @Test fun mapsNorwegianAndEnglishGenresToSharedTags() {
@@ -64,6 +91,42 @@ class ReleaseMatchingTest {
 
     private fun candidate(author: String, publisher: String?, genres: List<String>, fiction: Boolean?) =
         Candidate(record(publisher = publisher), author, genres, Genres.tags(genres, fiction), null)
+
+    private fun candidate(details: NbDetails) =
+        Candidate(record(publisher = "Ukjent"), details.author ?: "Ny Forfatter", details.genres, Genres.traits(details), details.summary, details.topics)
+
+    private val feelgoodReader = TasteProfile(listOf(
+        Book(title = "Det lille bakeriet", authors = "Jenny Colgan", rating = 5, publisher = "Cappelen Damm",
+            genres = Genres.encode(Genres.traits(NbDetails(listOf("Feelgood", "Romaner"), true, "nob", null, null, listOf("Bakerier", "Vennskap"), "adult", "823.92")))),
+        Book(title = "Ved første blikk", authors = "Jill Mansell", rating = 4, publisher = "Cappelen Damm",
+            genres = Genres.encode(Genres.traits(NbDetails(listOf("Feelgood", "Romantikk", "Romaner"), true, "nob", null, null, emptyList(), "adult", "823.92")))),
+    ))
+
+    private fun novel(genres: List<String>, summary: String? = null, topics: List<String> = emptyList(), audience: String? = "adult") =
+        candidate(NbDetails(genres, true, "nob", summary, null, topics, audience, "839.8238"))
+
+    @Test fun feelgoodReaderGetsFeelgoodBeforeOtherNovels() {
+        val cosy = feelgoodReader.score(novel(listOf("Feelgood", "Romaner"), topics = listOf("Vennskap")))
+        val plain = feelgoodReader.score(novel(listOf("Romaner")))
+        val literary = feelgoodReader.score(novel(listOf("Romaner"), "Prisbelønt roman om sorg.", listOf("Døden", "Sorg")))
+        val thriller = feelgoodReader.score(novel(listOf("Romaner", "Psykologiske thrillere"), "Han er på jakt etter det perfekte offeret."))
+        val youngAdult = feelgoodReader.score(novel(listOf("Feelgood", "Romaner"), audience = "juvenile"))
+
+        assertTrue("cosy ${cosy.percent}", cosy.percent >= 75)
+        assertTrue("${cosy.percent} > ${plain.percent}", cosy.percent > plain.percent)
+        assertTrue("${plain.percent} > ${literary.percent}", plain.percent > literary.percent)
+        assertTrue("${literary.percent} > ${thriller.percent}", literary.percent >= thriller.percent)
+        assertTrue("thriller ${thriller.percent}", thriller.percent < ReleaseFinder.MIN_PERCENT)
+        assertTrue("young adult ${youngAdult.percent}", youngAdult.percent < ReleaseFinder.MIN_PERCENT)
+        assertTrue(cosy.reasons.any { it is MatchReason.Theme && it.label == "Vennskap" && it.books == 1 })
+    }
+
+    @Test fun sameSeriesCountsLikeAFavourite() {
+        val reader = TasteProfile(listOf(Book(title = "Skyggedyr", authors = "Ulrika Rolfsdotter", rating = 5,
+            genres = Genres.encode(Genres.traits(NbCatalog.parseMods(mods("mods-skyggedyr.xml")))))))
+        val next = reader.score(candidate(NbDetails(listOf("Krim", "Romaner"), true, "nob", null, "Ny Forfatter", listOf("Annie Ljung (fiktiv person)"), "adult", "839.738")))
+        assertTrue(next.reasons.contains(MatchReason.Series("Annie Ljung")))
+    }
 
     @Test fun favouriteAuthorInFavouriteGenreScoresHighest() {
         val nesbo = profile.score(candidate("Jo Nesbø", "Aschehoug", listOf("Krim", "Romaner"), true))

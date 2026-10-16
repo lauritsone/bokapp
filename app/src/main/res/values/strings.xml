@@ -160,6 +160,11 @@
         <item quantity="one">%1$s, like %2$d of your books</item>
         <item quantity="other">%1$s, like %2$d of your books</item>
     </plurals>
+    <plurals name="reason_theme">
+        <item quantity="one">About %1$s, like %2$d of your books</item>
+        <item quantity="other">About %1$s, like %2$d of your books</item>
+    </plurals>
+    <string name="reason_series">With %1$s, like a book you’ve read</string>
     <string name="reason_publisher">From %1$s, a publisher you read</string>
     <string name="add_to_want">Add to Want to read</string>
     <string name="added_to_want">Added to Want to read</string>
@@ -170,6 +175,7 @@
     <string name="genre_scifi">Science fiction</string>
     <string name="genre_horror">Horror</string>
     <string name="genre_romance">Romance</string>
+    <string name="genre_feelgood">Feel-good</string>
     <string name="genre_historical">Historical fiction</string>
     <string name="genre_novel">Novels</string>
     <string name="genre_shortstories">Short stories</string>

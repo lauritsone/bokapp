@@ -36,6 +36,12 @@ data class NbDetails(
     val summary: String?,
     /** Main author from the statement of responsibility, without translators. */
     val author: String?,
+    /** Subject words, e.g. "Vennskap", "Sorg", "Maria Wern (fiktiv person)". */
+    val topics: List<String> = emptyList(),
+    /** "adult" or "juvenile" when the record says. */
+    val audience: String? = null,
+    /** Dewey number, e.g. "839.8238" (Norwegian fiction) or "641.5" (cooking). */
+    val dewey: String? = null,
 )
 
 /** Client for the parts of api.nb.no that Shelfmark uses. No API key needed. */
@@ -110,7 +116,19 @@ class NbCatalog {
             val responsibility = element("note").findAll(xml)
                 .firstOrNull { "statement of responsibility" in it.groupValues[1] }
                 ?.groupValues?.get(2)?.let(::unescape)
-            return NbDetails(genres, fiction, language, summary, responsibility?.let(::mainAuthor))
+            val topics = element("topic").findAll(xml).map { unescape(it.groupValues[2]).trim() }.filter { it.isNotEmpty() }.distinct().toList()
+            val audience = element("targetAudience").find(xml)?.groupValues?.get(2)?.let(::audienceOf)
+            val dewey = Regex("<(?:mods:)?classification[^>]*authority=\"ddc\"[^>]*>\\s*([0-9][0-9.]*)").find(xml)?.groupValues?.get(1)
+            return NbDetails(genres, fiction, language, summary, responsibility?.let(::mainAuthor), topics, audience, dewey)
+        }
+
+        /** "adult", "Voksne", "juvenile", "Barn" … as "adult" or "juvenile". */
+        private fun audienceOf(value: String): String? = foldText(value).let {
+            when {
+                "juvenile" in it || "barn" in it || "ungdom" in it -> "juvenile"
+                "adult" in it || "voksn" in it -> "adult"
+                else -> null
+            }
         }
 
         /** "Ulrika Rolfsdotter ; oversatt av Nina Wessel" → "Ulrika Rolfsdotter". */

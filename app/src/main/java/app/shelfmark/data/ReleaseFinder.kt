@@ -46,6 +46,10 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
                 searches += { nb.search("\"$author\"", year = y, size = 20).filter { wroteBy(it, author) } }
             }
         }
+        // The newest Norwegian books in the user's favourite genres (feelgood, crime …).
+        for (genre in profile.topGenres(limit = 3).mapNotNull { nbSubjects[it] }) {
+            searches += { nb.search("subject:\"$genre\"", year = year, size = 60).newest(20) }
+        }
         for (publisher in profile.favouritePublishers(limit = 3)) {
             searches += { nb.search("publisher:\"$publisher\"", year = year, size = 60).newest(15) }
         }
@@ -96,6 +100,8 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         // bibliography shows which titles they published before.
         val scored = candidates.map(profile::score).sortedByDescending { it.percent }
         val matches = concurrently(scored) { match -> match.takeUnless { isReissue(it.candidate, year) } }.filterNotNull()
+            // Poor matches only clutter the list, but a thin library should still see something.
+            .let { all -> all.filter { it.percent >= MIN_PERCENT }.takeIf { it.size >= 10 } ?: all.take(10) }
         return ReleaseResult(matches, profile.bookCount, library.count { it.ignoreForSuggestions })
     }
 
@@ -149,9 +155,10 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
                         wroteBy(r, it) && (titleKey(r.title) == wanted || foldText(r.title).startsWith(foldText(book.title)))
                     }
             }
-            ?: return emptySet()
+            // Not in the catalogue: the blurb from the book lookup can still tell the mood.
+            ?: return Genres.traits(NbDetails(emptyList(), null, null, null, null), book.description)
         val details = cachedDetails(record)
-        return Genres.tags(details.genres, details.fiction)
+        return Genres.traits(details, details.summary ?: book.description)
     }
 
     private suspend fun cachedDetails(record: CatalogRecord): NbDetails =
@@ -180,8 +187,9 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         record = record.copy(title = displayTitle(record.title)),
         author = details.author ?: record.creators.firstOrNull()?.let(::personName).orEmpty(),
         genreLabels = details.genres,
-        tags = Genres.tags(details.genres, details.fiction),
+        tags = Genres.traits(details),
         summary = details.summary,
+        topicLabels = details.topics,
     )
 
     private fun List<CatalogRecord>.newest(n: Int) = sortedByDescending { it.indexedAt }.take(n)
@@ -193,6 +201,19 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         }
 
     companion object {
+        /** Matches below this are left out, as long as enough better ones remain. */
+        const val MIN_PERCENT = 30
+
+        /** NB.no's subject word for each genre tag. */
+        private val nbSubjects = mapOf(
+            "feelgood" to "feelgood", "crime" to "krim", "fantasy" to "fantasy", "scifi" to "science fiction",
+            "horror" to "grøsser", "romance" to "romantikk", "historical" to "historiske romaner",
+            "shortstories" to "noveller", "poetry" to "dikt", "biography" to "biografier", "history" to "historie",
+            "essays" to "essays", "humor" to "humor", "selfhelp" to "selvhjelp", "cooking" to "kokebøker",
+            "travel" to "reiseskildringer", "nature" to "natur", "sport" to "idrett", "comics" to "tegneserier",
+            "children" to "barnebøker", "youngadult" to "ungdomsromaner",
+        )
+
         /** Open Library subject to search for each genre tag. */
         private val olSubjects = mapOf(
             "crime" to "crime", "fantasy" to "fantasy", "scifi" to "science fiction", "horror" to "horror",
@@ -201,6 +222,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
             "biography" to "biography", "history" to "history", "essays" to "essays", "humor" to "humor",
             "selfhelp" to "self-help", "cooking" to "cooking", "travel" to "travel", "nature" to "nature",
             "sport" to "sports", "comics" to "graphic novels", "novel" to "fiction",
+            "feelgood" to "humorous fiction",
         )
 
         /** Subtitles that only name the form, as in "Minnesota : roman". */

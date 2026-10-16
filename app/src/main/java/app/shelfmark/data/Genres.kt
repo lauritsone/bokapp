@@ -9,7 +9,7 @@ object Genres {
     const val NONFICTION = "nonfiction"
 
     /** When the tagging rules last changed; books tagged before this are tagged again. */
-    const val RULES_SINCE = 1_792_143_000_000L // 2026-10-16 09:30 UTC
+    const val RULES_SINCE = 1_792_152_000_000L // 2026-10-16 12:00 UTC
 
     /** Tag to the word stems (folded) that signal it. A genre may hit several. */
     private val stems = linkedMapOf(
@@ -85,6 +85,102 @@ object Genres {
     )
 
     private val fictionTags = setOf("feelgood", "crime", "fantasy", "scifi", "horror", "romance", "historical", "novel", "shortstories")
+
+    // ---------- Traits beyond genre ----------
+    // Stored with the genre tags, told apart by a prefix.
+
+    /** A subject word from the catalogue: "topic:vennskap". */
+    const val TOPIC = "topic:"
+
+    /** A recurring character, i.e. a series: "series:maria wern". */
+    const val SERIES = "series:"
+
+    /** Mood: light (feelgood, humour, romance), dark (crime, violence) or serious (grief, prize-winning literary). */
+    const val TONE = "tone:"
+    const val LIGHT = "tone:light"
+    const val DARK = "tone:dark"
+    const val SERIOUS = "tone:serious"
+
+    const val JUVENILE = "audience:juvenile"
+    const val ADULT = "audience:adult"
+
+    /** Which literature a novel comes from, by its Dewey number: "lit:norwegian". */
+    const val LITERATURE = "lit:"
+
+    /** Non-fiction subject by Dewey class: "dewey:641" is food and cooking. */
+    const val DEWEY = "dewey:"
+
+    /** Whether [tag] is a genre (crime, novel, a catalogue word, a Dewey class) rather than another trait. */
+    fun isGenre(tag: String) = tag != FICTION && tag != NONFICTION &&
+        listOf(TOPIC, SERIES, TONE, "audience:", LITERATURE).none { tag.startsWith(it) }
+
+    /**
+     * Everything a catalogue record says about what kind of book it is: genre tags, subjects,
+     * series, mood, audience and origin. [summary] is the blurb, used to judge the mood.
+     */
+    fun traits(details: NbDetails, summary: String? = details.summary): Set<String> {
+        val tags = tags(details.genres, details.fiction).toMutableSet()
+        val topics = details.topics.map(::foldText).filter { it.isNotEmpty() }
+        for (topic in topics) {
+            tags += if (topic.endsWith(" fiktiv person")) SERIES + topic.removeSuffix(" fiktiv person") else TOPIC + topic
+        }
+        when {
+            details.audience == "juvenile" || "children" in tags || "youngadult" in tags -> tags += JUVENILE
+            details.audience == "adult" -> tags += ADULT
+        }
+        details.dewey?.let { dewey ->
+            if (dewey.startsWith("8")) literature(dewey)?.let { tags += LITERATURE + it }
+            else if (dewey.length >= 3 && FICTION !in tags) tags += DEWEY + dewey.take(3)
+        }
+        tags += tones(tags, topics, summary?.let(::foldText).orEmpty())
+        return tags
+    }
+
+    /** Dewey 800s are literature by language: 823 English, 839.82 Norwegian, 839.7 Swedish … */
+    fun literature(dewey: String): String? = when {
+        dewey.startsWith("839.82") || dewey.startsWith("839.83") -> "norwegian"
+        dewey.startsWith("839.81") -> "danish"
+        dewey.startsWith("839.7") -> "swedish"
+        dewey.startsWith("839.69") -> "icelandic"
+        dewey.startsWith("839.3") -> "dutch"
+        dewey.startsWith("81") -> "american"
+        dewey.startsWith("82") -> "english"
+        dewey.startsWith("83") -> "german"
+        dewey.startsWith("84") -> "french"
+        dewey.startsWith("85") -> "italian"
+        dewey.startsWith("86") -> "spanish"
+        dewey.startsWith("891.7") -> "russian"
+        dewey.startsWith("895.6") -> "japanese"
+        dewey.length >= 3 -> dewey.take(3)
+        else -> null
+    }
+
+    // Folded word stems; a stem matches at the start of a word.
+    private val lightWords = listOf(
+        "feelgood", "feel good", "hjertevarm", "humoristisk", "morsom", "sjarmerende", "koselig", "livsbejaende",
+        "romantisk komedie", "lun humor", "heartwarming", "uplifting", "romantic comed", "charming", "cozy", "cosy",
+        "humorous", "hilarious", "love stories", "chick lit",
+    )
+    private val darkWords = listOf(
+        "drap", "drept", "mord", "morder", "seriemord", "etterforsk", "voldtekt", "overgrep", "psykopat", "kidnapp",
+        "thriller", "murder", "killer", "detective", "serial kill", "psychological",
+    )
+    private val seriousWords = listOf(
+        "sorg", "doden", "selvmord", "traume", "abort", "eksistensiell", "nobelpris", "prisbelont", "prisvinnende",
+        "litteraturpris", "kritikerpris", "brageprisen", "kritikerrost", "grief", "booker", "pulitzer",
+    )
+    private val seriousTopics = setOf("doden", "sorg", "selvmord", "abort", "overgrep", "traumer", "incest", "psykiske lidelser")
+
+    private fun tones(tags: Set<String>, topics: List<String>, summary: String): Set<String> {
+        val text = " $summary "
+        fun mentions(words: List<String>) = words.any { " $it" in text }
+        val tones = mutableSetOf<String>()
+        if (tags.any { it == "feelgood" || it == "romance" || it == "humor" } || mentions(lightWords)) tones += LIGHT
+        if (tags.any { it == "crime" || it == "horror" } || mentions(darkWords)) tones += DARK
+        // A feelgood novel may well deal with grief; its genre says more than the topic.
+        if (LIGHT !in tones && (topics.any { it in seriousTopics } || mentions(seriousWords))) tones += SERIOUS
+        return tones
+    }
 
     fun encode(tags: Set<String>): String = tags.sorted().joinToString("|")
 
