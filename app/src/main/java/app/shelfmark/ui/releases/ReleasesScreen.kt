@@ -1,5 +1,8 @@
 package app.shelfmark.ui.releases
 
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.FilterChip
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -155,8 +158,17 @@ private fun Offline(onRetry: () -> Unit) {
     }
 }
 
+/** Which languages to show; English books come from Open Library, Norwegian from NB.no. */
+private enum class LanguageFilter(@StringRes val label: Int, val language: String?) {
+    All(R.string.lang_all, null),
+    Norwegian(R.string.lang_norwegian, "nob"),
+    English(R.string.lang_english, "eng"),
+}
+
 @Composable
 private fun ReleaseList(state: ReleasesState.Loaded, onOpen: (Match) -> Unit) {
+    var filter by rememberSaveable { mutableStateOf(LanguageFilter.All) }
+    val shown = state.result.matches.filter { filter.language == null || it.candidate.record.language == filter.language }
     LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp)) {
         item(key = "intro") {
             Column(Modifier.padding(bottom = 8.dp)) {
@@ -173,9 +185,19 @@ private fun ReleaseList(state: ReleasesState.Loaded, onOpen: (Match) -> Unit) {
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LanguageFilter.entries.forEach { f ->
+                        FilterChip(
+                            selected = f == filter,
+                            onClick = { filter = f },
+                            label = { Text(stringResource(f.label), style = MaterialTheme.typography.labelLarge) },
+                        )
+                    }
+                }
             }
         }
-        if (state.result.matches.isEmpty()) {
+        if (shown.isEmpty()) {
             item(key = "empty") {
                 Text(
                     stringResource(R.string.releases_empty),
@@ -186,7 +208,7 @@ private fun ReleaseList(state: ReleasesState.Loaded, onOpen: (Match) -> Unit) {
                 )
             }
         }
-        items(state.result.matches, key = { it.candidate.record.id }) { match ->
+        items(shown, key = { it.candidate.record.id }) { match ->
             ReleaseRow(match, added = match.candidate.record.id in state.added, onClick = { onOpen(match) })
             HorizontalDivider(
                 modifier = Modifier.padding(start = 88.dp),
@@ -211,10 +233,14 @@ private fun ReleaseRow(match: Match, added: Boolean, onClick: () -> Unit) {
         Spacer(Modifier.width(20.dp))
         Column(Modifier.weight(1f)) {
             Text(c.record.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (c.author.isNotBlank()) {
+            val byline = listOfNotNull(
+                c.author.ifBlank { null },
+                if (c.record.language == "eng") stringResource(R.string.lang_english) else null,
+            ).joinToString(" · ")
+            if (byline.isNotEmpty()) {
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    c.author,
+                    byline,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -266,9 +292,25 @@ private fun reasonText(reason: MatchReason): String = when (reason) {
     is MatchReason.Author ->
         if (reason.rating != null) stringResource(R.string.reason_author, reason.name, reason.rating)
         else stringResource(R.string.reason_author_unrated, reason.name)
-    is MatchReason.Genre -> pluralStringResource(R.plurals.reason_genre, reason.books, reason.label, reason.books)
+    is MatchReason.Genre -> pluralStringResource(
+        R.plurals.reason_genre,
+        reason.books,
+        genreNames[reason.tag]?.let { stringResource(it) } ?: reason.label,
+        reason.books,
+    )
     is MatchReason.Publisher -> stringResource(R.string.reason_publisher, reason.name)
 }
+
+/** Short names, in the app's language, for the shared genre tags. */
+private val genreNames = mapOf(
+    "crime" to R.string.genre_crime, "fantasy" to R.string.genre_fantasy, "scifi" to R.string.genre_scifi,
+    "horror" to R.string.genre_horror, "romance" to R.string.genre_romance, "historical" to R.string.genre_historical,
+    "novel" to R.string.genre_novel, "shortstories" to R.string.genre_shortstories, "poetry" to R.string.genre_poetry,
+    "children" to R.string.genre_children, "youngadult" to R.string.genre_youngadult, "biography" to R.string.genre_biography,
+    "history" to R.string.genre_history, "essays" to R.string.genre_essays, "humor" to R.string.genre_humor,
+    "selfhelp" to R.string.genre_selfhelp, "cooking" to R.string.genre_cooking, "travel" to R.string.genre_travel,
+    "nature" to R.string.genre_nature, "sport" to R.string.genre_sport, "comics" to R.string.genre_comics,
+)
 
 @Composable
 private fun ReleaseDetails(match: Match, added: Boolean, onAdd: () -> Unit) {
@@ -289,7 +331,12 @@ private fun ReleaseDetails(match: Match, added: Boolean, onAdd: () -> Unit) {
                 if (c.author.isNotBlank()) {
                     Text(c.author, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                val facts = listOfNotNull(c.record.publisher, c.record.year?.toString(), c.genreLabels.takeIf { it.isNotEmpty() }?.joinToString(", "))
+                val facts = listOfNotNull(
+                    c.record.publisher,
+                    c.record.year?.toString(),
+                    if (c.record.language == "eng") stringResource(R.string.lang_english) else null,
+                    c.genreLabels.takeIf { it.isNotEmpty() }?.take(4)?.joinToString(", "),
+                )
                 Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(10.dp))
                 MatchBadge(match.percent)

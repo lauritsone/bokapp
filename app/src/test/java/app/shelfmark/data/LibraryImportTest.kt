@@ -13,6 +13,7 @@ class LibraryImportTest {
             title = "Snømannen", authors = "Jo Nesbø", rating = 4, shelf = Shelf.Read,
             notes = "Spennende, \"mørk\"\nAndre linje", isbn = "9788203362446", publisher = "Aschehoug",
             publishedDate = "2017", pageCount = 445, addedAt = 1_700_000_000_000,
+            coverUrl = "https://www.nb.no/services/image/resolver/URN:NBN:no-nb_digibok_2023071907012_C1/full/0,200/0/native.jpg",
         ),
         Book(title = "Pippi Långstrump", authors = "Astrid Lindgren", shelf = Shelf.WantToRead),
         Book(title = "Pride and Prejudice", authors = "Jane Austen", shelf = Shelf.Reading, publisher = "Penguin, UK"),
@@ -36,6 +37,7 @@ class LibraryImportTest {
         assertEquals("Aschehoug", sno.publisher)
         assertEquals("2017", sno.publishedDate)
         assertEquals(445, sno.pageCount)
+        assertEquals(books[0].coverUrl, sno.coverUrl)
         assertEquals(Shelf.WantToRead, imported[1].shelf)
         assertEquals(Shelf.Reading, imported[2].shelf)
         assertEquals("Penguin, UK", imported[2].publisher)
@@ -68,7 +70,8 @@ class LibraryImportTest {
         assertEquals(5, books[0].rating)
         assertEquals(310, books[0].pageCount)
         assertEquals("Loved it", books[0].notes)
-        assertTrue(books[0].coverUrl!!.contains("9780261102217"))
+        // No cover is guessed at import; BookRepository.repairCovers looks one up afterwards.
+        assertNull(books[0].coverUrl)
         assertEquals(Shelf.WantToRead, books[1].shelf)
         assertNull(books[1].isbn)
         assertEquals(Shelf.Reading, books[2].shelf)

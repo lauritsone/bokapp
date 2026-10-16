@@ -112,7 +112,8 @@ object LibraryImport {
                 publishedDate = cell("published"),
                 pageCount = cell("pages")?.filter(Char::isDigit)?.toIntOrNull()?.takeIf { it > 0 },
                 description = cell("description"),
-                coverUrl = cell("cover") ?: isbn?.let(::openLibraryCover),
+                // Without a cover link, BookRepository.repairCovers finds one after the import.
+                coverUrl = cell("cover"),
                 addedAt = parseTime(cell("added")) ?: now,
                 updatedAt = parseTime(cell("updated")) ?: now,
             )
@@ -185,6 +186,4 @@ object LibraryImport {
             null
         }
     }
-
-    private fun openLibraryCover(isbn: String) = "https://covers.openlibrary.org/b/isbn/$isbn-L.jpg?default=false"
 }

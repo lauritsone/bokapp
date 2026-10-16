@@ -2,7 +2,7 @@ package app.shelfmark.data
 
 /** A new book to suggest, with what its catalogue record says about it. */
 data class Candidate(
-    val record: NbRecord,
+    val record: CatalogRecord,
     val author: String,
     /** Genre words as catalogued, for display. */
     val genreLabels: List<String>,
@@ -13,7 +13,8 @@ data class Candidate(
 /** Why a book got its score; shown under the match percentage. */
 sealed interface MatchReason {
     data class Author(val name: String, val rating: Int?) : MatchReason
-    data class Genre(val label: String, val books: Int) : MatchReason
+    /** [tag] is a shared genre tag (see [Genres]); [label] is the catalogue's own word for it. */
+    data class Genre(val tag: String, val label: String, val books: Int) : MatchReason
     data class Publisher(val name: String) : MatchReason
 }
 
@@ -79,6 +80,12 @@ class TasteProfile(books: List<Book>) {
         publisherWeights.filterValues { it > 0.3 }.entries.sortedByDescending { it.value }.take(limit)
             .map { publisherNames.getValue(it.key) }
 
+    /** Genres the user reads most, specific ones before the catch-all "novel". */
+    fun topGenres(limit: Int): List<String> =
+        genreWeights.filterValues { it > 0.3 }.entries
+            .sortedWith(compareBy({ it.key == "novel" }, { -it.value }))
+            .take(limit).map { it.key }
+
     fun score(c: Candidate): Match {
         val reasons = mutableListOf<MatchReason>()
 
@@ -107,7 +114,7 @@ class TasteProfile(books: List<Book>) {
         // "Novel" says little; name a more telling genre when one matches too.
         val telling = genreHits.filter { it.second >= 0.3 }
         (telling.firstOrNull { it.first != "novel" } ?: telling.firstOrNull())?.let { (tag, _) ->
-            reasons += MatchReason.Genre(labelFor(tag, c), genreCounts[tag] ?: 0)
+            reasons += MatchReason.Genre(tag, labelFor(tag, c), genreCounts[tag] ?: 0)
         }
 
         // Fiction or not, in the proportion the user reads it.
@@ -123,9 +130,13 @@ class TasteProfile(books: List<Book>) {
         val publisherScore = c.record.publisher?.let { publisherKey(it) }
             ?.let { key -> if (maxPublisher == null) 0.0 else ((publisherWeights[key] ?: 0.0) / maxPublisher).coerceIn(0.0, 1.0) }
             ?: 0.0
-        if (publisherScore >= 0.3) reasons += MatchReason.Publisher(c.record.publisher!!)
+        if (c.record.language == "nob" && publisherScore >= 0.3) reasons += MatchReason.Publisher(c.record.publisher!!)
 
-        var score = 0.40 * authorScore.coerceAtLeast(0.0) + 0.30 * genreScore + 0.15 * formScore + 0.15 * publisherScore
+        // The user's publishers are the Norwegian houses they read, so for books from other
+        // markets (English editions) the publisher part is left out rather than counted as a miss.
+        val usesPublisher = c.record.language == "nob"
+        var score = (0.40 * authorScore.coerceAtLeast(0.0) + 0.30 * genreScore + 0.15 * formScore +
+            (if (usesPublisher) 0.15 * publisherScore else 0.0)) / (if (usesPublisher) 1.0 else 0.85)
         if (authorScore < 0) score *= 0.4
         return Match(c, (score * 100).toInt().coerceIn(1, 99), reasons)
     }

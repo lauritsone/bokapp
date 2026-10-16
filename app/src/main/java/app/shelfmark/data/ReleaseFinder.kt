@@ -20,11 +20,12 @@ sealed interface ReleaseProgress {
 data class ReleaseResult(val matches: List<Match>, val profileSize: Int)
 
 /**
- * Finds new books in the Norwegian National Library's catalogue: recent books by the
- * user's favourite authors and the newest books from the publishers they read most,
- * each scored against a [TasteProfile] of their library.
+ * Finds new books: Norwegian ones in the National Library's catalogue (recent books by
+ * the user's favourite authors, newest books from the publishers they read most) and
+ * English ones on Open Library (new books by those authors, and the most-read new books
+ * in their favourite genres). Each is scored against a [TasteProfile] of their library.
  */
-class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
+class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private val ol: OlCatalog) {
 
     private val detailsCache = ConcurrentHashMap<String, NbDetails>()
     private val firstYearsCache = ConcurrentHashMap<String, Map<String, Int>>()
@@ -38,7 +39,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
 
         onProgress(ReleaseProgress.Searching)
         val failures = AtomicInteger()
-        val searches = mutableListOf<suspend () -> List<NbRecord>>()
+        val searches = mutableListOf<suspend () -> List<CatalogRecord>>()
         for (author in profile.favouriteAuthors(limit = 8)) {
             for (y in listOf(year, year - 1)) {
                 searches += { nb.search("\"$author\"", year = y, size = 20).filter { wroteBy(it, author) } }
@@ -47,8 +48,16 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
         for (publisher in profile.favouritePublishers(limit = 3)) {
             searches += { nb.search("publisher:\"$publisher\"", year = year, size = 60).newest(15) }
         }
-        if (searches.isEmpty()) {
-            // Nothing to go on yet: show this year's newest books.
+        // English: the same authors' new books, and the most-read new books in the user's genres.
+        for (author in profile.favouriteAuthors(limit = 6)) {
+            searches += { ol.search("author:\"$author\"", fromYear = year - 1, limit = 5).filter { wroteBy(it, author) } }
+        }
+        val subjects = profile.topGenres(limit = 3).mapNotNull { olSubjects[it] }.ifEmpty { listOf("fiction") }
+        for (subject in subjects) {
+            searches += { ol.search("subject:\"$subject\"", fromYear = year - 1, limit = 12, popular = true) }
+        }
+        if (profile.favouriteAuthors(1).isEmpty() && profile.favouritePublishers(1).isEmpty()) {
+            // Nothing to go on yet: show this year's newest Norwegian books too.
             searches += { nb.search("*", year = year, size = 60).newest(25) }
         }
         val found = concurrently(searches) { search ->
@@ -67,14 +76,14 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
             .filter { it.isbn !in owned && titleKey(it.title) !in ownedTitles }
             // The same book is often catalogued again a year later; keep the first.
             .sortedWith(compareBy({ it.year ?: Int.MAX_VALUE }, { -it.indexedAt }))
-            .distinctBy { titleKey(it.title) + "|" + it.creators.firstOrNull()?.let(::foldText) }
-            .take(60)
+            .distinctBy { titleKey(it.title) + "|" + it.creators.firstOrNull()?.let(::foldText) + "|" + it.language }
+            .take(80)
 
         val done = AtomicInteger()
         onProgress(ReleaseProgress.ReadingDetails(0, fresh.size))
         val candidates = concurrently(fresh) { record ->
             val details = try {
-                cachedDetails(record.id)
+                cachedDetails(record)
             } catch (e: IOException) {
                 null
             }
@@ -91,7 +100,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
 
     /** Looks up genres for library books that don't have them yet, a batch at a time. */
     private suspend fun learnGenres(onProgress: (ReleaseProgress) -> Unit) {
-        val pending = dao.getAll().filter { it.profiledAt == 0L }.take(40)
+        val pending = dao.getAll().filter { it.profiledAt < Genres.RULES_SINCE }.take(40)
         if (pending.isEmpty()) return
         val done = AtomicInteger()
         onProgress(ReleaseProgress.LearningTaste(0, pending.size))
@@ -108,6 +117,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
 
     /** Whether the author's bibliography has this title from before last year. */
     private suspend fun isReissue(c: Candidate, year: Int): Boolean {
+        if (c.record.knownFirstEdition) return false
         val author = c.record.creators.firstOrNull() ?: return false
         val firstYears = try {
             firstYearsCache[author] ?: firstYears(author).also { firstYearsCache[author] = it }
@@ -139,14 +149,33 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
                     }
             }
             ?: return emptySet()
-        val details = cachedDetails(record.id)
+        val details = cachedDetails(record)
         return Genres.tags(details.genres, details.fiction)
     }
 
-    private suspend fun cachedDetails(id: String): NbDetails =
-        detailsCache[id] ?: nb.details(id).also { detailsCache[id] = it }
+    private suspend fun cachedDetails(record: CatalogRecord): NbDetails =
+        detailsCache[record.id] ?: fetchDetails(record).also { detailsCache[record.id] = it }
 
-    fun toCandidate(record: NbRecord, details: NbDetails) = Candidate(
+    private suspend fun fetchDetails(record: CatalogRecord): NbDetails =
+        if (record.id.startsWith(OlCatalog.ID_PREFIX)) {
+            // Open Library's subjects came with the search; only the description needs a request.
+            val folded = record.subjects.map(::foldText)
+            NbDetails(
+                genres = record.subjects,
+                fiction = when {
+                    folded.any { "nonfiction" in it.replace(" ", "") } -> false
+                    folded.any { "fiction" in it } -> true
+                    else -> null
+                },
+                language = record.language,
+                summary = ol.description(record),
+                author = record.creators.firstOrNull(),
+            )
+        } else {
+            nb.details(record.id)
+        }
+
+    fun toCandidate(record: CatalogRecord, details: NbDetails) = Candidate(
         record = record.copy(title = displayTitle(record.title)),
         author = details.author ?: record.creators.firstOrNull()?.let(::personName).orEmpty(),
         genreLabels = details.genres,
@@ -154,7 +183,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
         summary = details.summary,
     )
 
-    private fun List<NbRecord>.newest(n: Int) = sortedByDescending { it.indexedAt }.take(n)
+    private fun List<CatalogRecord>.newest(n: Int) = sortedByDescending { it.indexedAt }.take(n)
 
     private suspend fun <T, R> concurrently(items: List<T>, parallel: Int = 6, block: suspend (T) -> R): List<R> =
         coroutineScope {
@@ -163,6 +192,16 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
         }
 
     companion object {
+        /** Open Library subject to search for each genre tag. */
+        private val olSubjects = mapOf(
+            "crime" to "crime", "fantasy" to "fantasy", "scifi" to "science fiction", "horror" to "horror",
+            "romance" to "romance", "historical" to "historical fiction", "shortstories" to "short stories",
+            "poetry" to "poetry", "children" to "juvenile fiction", "youngadult" to "young adult fiction",
+            "biography" to "biography", "history" to "history", "essays" to "essays", "humor" to "humor",
+            "selfhelp" to "self-help", "cooking" to "cooking", "travel" to "travel", "nature" to "nature",
+            "sport" to "sports", "comics" to "graphic novels", "novel" to "fiction",
+        )
+
         /** Subtitles that only name the form, as in "Minnesota : roman". */
         private val formSubtitles = setOf("roman", "krim", "krimroman", "kriminalroman", "noveller", "dikt", "thriller", "spenningsroman", "novel")
 
@@ -182,7 +221,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog) {
         fun titleKey(title: String) = foldText(displayTitle(title).substringBefore(": "))
 
         /** Whether the record lists [author] among its creators ("Nesbø, Jo" matches "Jo Nesbø"). */
-        fun wroteBy(record: NbRecord, author: String): Boolean {
+        fun wroteBy(record: CatalogRecord, author: String): Boolean {
             val wanted = foldText(author).split(' ').toSet()
             return record.creators.any { foldText(it).split(' ').toSet().containsAll(wanted) }
         }

@@ -26,6 +26,13 @@ class ReleaseMatchingTest {
         // Unknown genres are kept as words, so they still match the same word elsewhere.
         assertTrue("sjorovere" in Genres.tags(listOf("Sjørøvere"), null))
         assertEquals(setOf("crime", "novel"), Genres.decode(Genres.encode(setOf("novel", "crime"))))
+        // "Roman" means novel, but romance and romantikk are their own genre.
+        assertEquals(setOf("romance", Genres.FICTION), Genres.tags(listOf("Romance"), null))
+        assertEquals(setOf("romance", "novel", Genres.FICTION), Genres.tags(listOf("Romantikk", "Serieromaner"), null))
+        // Open Library's English labels.
+        assertEquals(setOf("novel", Genres.FICTION), Genres.tags(listOf("Literary Fiction"), null))
+        assertTrue("crime" in Genres.tags(listOf("Fiction, thrillers, crime"), null))
+        assertEquals(setOf(Genres.NONFICTION), Genres.tags(listOf("Nonfiction"), null))
     }
 
     @Test fun cleansCatalogueTitles() {
@@ -53,7 +60,7 @@ class ReleaseMatchingTest {
     private val profile = TasteProfile(library)
 
     private fun record(title: String = "Ny bok", creators: List<String> = emptyList(), publisher: String? = null) =
-        NbRecord("id", title, creators, publisher, 2026, null, null, null, 0)
+        CatalogRecord("id", title, creators, publisher, 2026, null, null, null, 0)
 
     private fun candidate(author: String, publisher: String?, genres: List<String>, fiction: Boolean?) =
         Candidate(record(publisher = publisher), author, genres, Genres.tags(genres, fiction), null)
@@ -75,6 +82,28 @@ class ReleaseMatchingTest {
         assertTrue(nesbo.reasons.any { it is MatchReason.Genre && it.label == "Krim" && it.books == 3 })
         assertTrue(nesbo.reasons.any { it == MatchReason.Publisher("Aschehoug") })
         assertTrue(cookbook.reasons.isEmpty())
+    }
+
+    @Test fun englishEditionsAreNotPenalisedForUnknownPublishers() {
+        val tags = Genres.tags(listOf("Krim"), true)
+        val norwegian = profile.score(Candidate(record(publisher = "Ukjent Forlag"), "Ny Forfatter", listOf("Krim"), tags, null))
+        val english = profile.score(Candidate(record(publisher = "Penguin").copy(language = "eng"), "New Author", listOf("Crime"), tags, null))
+        assertTrue("eng ${english.percent} nob ${norwegian.percent}", english.percent > norwegian.percent)
+        assertTrue(english.reasons.none { it is MatchReason.Publisher })
+    }
+
+    @Test fun readsOpenLibrarySearch() {
+        val json = """{"docs":[{"key":"/works/OL42407794W","title":"Mina vänner","author_name":["Fredrik Backman"],
+            "first_publish_year":2025,"subject":["Fiction","nyt:combined=2025","genre:Contemporary"],"cover_i":1,
+            "editions":{"docs":[{"title":"My Friends","language":["eng"],"isbn":["1982121653","9781982121655"],"cover_i":15094954,"publisher":["Atria Books"]}]}}]}"""
+        val r = OlCatalog.parseSearch(json).single()
+        assertEquals("My Friends", r.title)
+        assertEquals("9781982121655", r.isbn)
+        assertEquals("Atria Books", r.publisher)
+        assertEquals("https://covers.openlibrary.org/b/id/15094954-L.jpg", r.coverUrl)
+        assertEquals(listOf("Fiction", "Contemporary"), r.subjects)
+        assertEquals("eng", r.language)
+        assertTrue(r.knownFirstEdition)
     }
 
     @Test fun picksAuthorsAndPublishersToSearch() {

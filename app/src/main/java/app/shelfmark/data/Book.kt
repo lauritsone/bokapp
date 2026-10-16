@@ -28,6 +28,8 @@ data class Book(
     val genres: String? = null,
     /** When [genres] was last looked up; 0 = not yet. */
     @ColumnInfo(defaultValue = "0") val profiledAt: Long = 0,
+    /** When a missing cover was last looked for; 0 = not yet. */
+    @ColumnInfo(defaultValue = "0") val coverCheckedAt: Long = 0,
     val addedAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

@@ -42,6 +42,10 @@ interface BookDao {
     @Query("UPDATE books SET genres = :genres, profiledAt = :now WHERE id = :id")
     suspend fun setGenres(id: Long, genres: String?, now: Long)
 
+    /** Sets the cover and marks it as checked. */
+    @Query("UPDATE books SET coverUrl = :coverUrl, coverCheckedAt = :now WHERE id = :id")
+    suspend fun setCover(id: Long, coverUrl: String?, now: Long)
+
     @Delete
     suspend fun delete(book: Book)
 }

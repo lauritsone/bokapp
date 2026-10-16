@@ -138,14 +138,14 @@
 
     <!-- New releases -->
     <string name="releases_title">Nye bøker for deg</string>
-    <string name="releases_entry_subtitle">Nye bøker fra forfatterne og forlagene dine, med treffprosent</string>
+    <string name="releases_entry_subtitle">Nye norske og engelske bøker etter din smak, med treffprosent</string>
     <string name="releases_learning">Lærer smaken din … %1$d av %2$d bøker</string>
     <string name="releases_searching">Leter etter nye bøker …</string>
     <string name="releases_reading">Leser om nye bøker … %1$d av %2$d</string>
     <string name="releases_offline">Fikk ikke kontakt med bibliotekkatalogen. Sjekk nettet og prøv igjen.</string>
     <string name="releases_empty">Fant ingen nye bøker akkurat nå. Prøv igjen senere.</string>
     <string name="releases_few_books">Gi karakter til flere bøker for mer treffsikre forslag.</string>
-    <string name="releases_source">Nye norske bøker fra Nasjonalbibliotekets katalog (nb.no), sammenlignet med biblioteket ditt.</string>
+    <string name="releases_source">Nye norske bøker fra Nasjonalbibliotekets katalog (nb.no) og nye engelske bøker fra Open Library, sammenlignet med biblioteket ditt.</string>
     <string name="refresh">Oppdater</string>
     <string name="try_again">Prøv igjen</string>
     <string name="match_percent">%1$d %% treff</string>
@@ -158,4 +158,30 @@
     <string name="reason_publisher">Fra %1$s, et forlag du leser</string>
     <string name="add_to_want">Legg i Vil lese</string>
     <string name="added_to_want">Lagt i Vil lese</string>
+
+    <!-- Genre names for match reasons -->
+    <string name="genre_crime">Krim</string>
+    <string name="genre_fantasy">Fantasy</string>
+    <string name="genre_scifi">Science fiction</string>
+    <string name="genre_horror">Grøsser</string>
+    <string name="genre_romance">Romantikk</string>
+    <string name="genre_historical">Historiske romaner</string>
+    <string name="genre_novel">Romaner</string>
+    <string name="genre_shortstories">Noveller</string>
+    <string name="genre_poetry">Dikt</string>
+    <string name="genre_children">Barnebøker</string>
+    <string name="genre_youngadult">Ungdomsbøker</string>
+    <string name="genre_biography">Biografier</string>
+    <string name="genre_history">Historie</string>
+    <string name="genre_essays">Essays</string>
+    <string name="genre_humor">Humor</string>
+    <string name="genre_selfhelp">Selvhjelp</string>
+    <string name="genre_cooking">Mat og drikke</string>
+    <string name="genre_travel">Reise</string>
+    <string name="genre_nature">Natur</string>
+    <string name="genre_sport">Sport</string>
+    <string name="genre_comics">Tegneserier</string>
+    <string name="lang_all">Alle</string>
+    <string name="lang_norwegian">Norsk</string>
+    <string name="lang_english">Engelsk</string>
 </resources>

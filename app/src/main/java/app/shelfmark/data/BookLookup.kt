@@ -7,8 +7,6 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 data class BookInfo(
     val isbn: String,
@@ -40,8 +38,10 @@ class BookLookup {
                 val info = source(isbn)
                 reachedASource = true
                 if (info != null) {
+                    // Only keep the guessed Open Library cover if it really exists; otherwise
+                    // the cover repair in BookRepository looks elsewhere later.
                     return@withContext if (info.coverUrl == null) {
-                        info.copy(coverUrl = openLibraryCover(isbn))
+                        info.copy(coverUrl = openLibraryCover(isbn).takeIf { runCatching { imageExists(it) }.getOrDefault(false) })
                     } else {
                         info
                     }
@@ -143,20 +143,6 @@ class BookLookup {
 
     private fun openLibraryCover(isbn: String) =
         "https://covers.openlibrary.org/b/isbn/$isbn-L.jpg?default=false"
-
-    private fun httpGet(url: String): String {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 8_000
-        conn.readTimeout = 8_000
-        conn.setRequestProperty("User-Agent", "Shelfmark/1.0 (Android reading log)")
-        try {
-            val code = conn.responseCode
-            if (code !in 200..299) throw IOException("HTTP $code from $url")
-            return conn.inputStream.bufferedReader().use { it.readText() }
-        } finally {
-            conn.disconnect()
-        }
-    }
 
     private fun stripHtml(s: String): String =
         Html.fromHtml(s, Html.FROM_HTML_MODE_LEGACY).toString().trim()

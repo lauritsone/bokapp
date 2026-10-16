@@ -8,7 +8,10 @@ object Genres {
     const val FICTION = "fiction"
     const val NONFICTION = "nonfiction"
 
-    /** Tag to the word stems (folded) that signal it. Checked in order; a genre may hit several. */
+    /** When the tagging rules last changed; books tagged before this are tagged again. */
+    const val RULES_SINCE = 1_792_108_800_000L // 2026-10-16
+
+    /** Tag to the word stems (folded) that signal it. A genre may hit several. */
     private val stems = linkedMapOf(
         "crime" to listOf("krim", "crime", "detective", "detektiv", "mystery", "mysteries", "thriller", "spenning", "politiroman"),
         "fantasy" to listOf("fantasy"),
@@ -16,7 +19,8 @@ object Genres {
         "horror" to listOf("grosser", "horror", "skrekk"),
         "romance" to listOf("romance", "romantikk", "kjaerlighetsroman", "love stories"),
         "historical" to listOf("historiske romaner", "historical fiction", "historisk roman"),
-        "novel" to listOf("roman", "novel"),
+        // Not plain "roman": that would also catch "romance" and "romantikk".
+        "novel" to listOf(),
         "shortstories" to listOf("novelle", "short stor"),
         "poetry" to listOf("dikt", "poetry", "poems", "lyrikk"),
         "children" to listOf("barnebok", "barneboker", "bildebok", "bildeboker", "children", "juvenile", "picture book"),
@@ -33,15 +37,29 @@ object Genres {
         "comics" to listOf("tegneserie", "comic", "graphic novel"),
     )
 
+    /** "Romaner", "Kriminalroman", "Novel", "Fiction", "Literary fiction", but not "Romance" or "Nonfiction". */
+    private val novelPattern = Regex("roman(er|en|ene)?\\b|\\bnovels?\\b|^(literary |general |contemporary )?fiction$|^fiction ")
+    private val nonfictionPattern = Regex("\\bnon ?fiction\\b|\\bsakprosa\\b|\\bfaglitteratur\\b")
+
     /** Shared tags for a book's genre words, plus [FICTION] or [NONFICTION] when known. */
     fun tags(genres: Collection<String>, fiction: Boolean?): Set<String> {
         val tags = mutableSetOf<String>()
+        var saysNonfiction = false
         for (genre in genres) {
             val folded = foldText(genre)
             if (folded.isEmpty()) continue
-            val hits = stems.filterValues { list -> list.any { it in folded } }.keys
+            if (nonfictionPattern.containsMatchIn(folded)) {
+                saysNonfiction = true
+                continue
+            }
+            val hits = stems.filterValues { list -> list.any { it in folded } }.keys.toMutableSet()
+            if (novelPattern.containsMatchIn(folded)) hits += "novel"
             // Unknown genres still match the same word on other books.
             tags += hits.ifEmpty { setOf(folded) }
+        }
+        if (fiction == null && saysNonfiction) {
+            tags += NONFICTION
+            return tags
         }
         when (fiction) {
             true -> tags += FICTION

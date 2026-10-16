@@ -29,7 +29,7 @@ object LibraryExport {
     private fun writeCsv(books: List<Book>, out: OutputStream) {
         val header = listOf(
             "title", "authors", "shelf", "rating", "notes", "isbn",
-            "publisher", "published", "pages", "added", "updated",
+            "publisher", "published", "pages", "added", "updated", "cover_url",
         )
         val writer = out.bufferedWriter(Charsets.UTF_8)
         // The byte-order mark makes Excel read æ, ø and å correctly.
@@ -38,7 +38,7 @@ object LibraryExport {
         for (b in books) {
             val row = listOf(
                 b.title, b.authors, b.shelf.key, b.rating.takeIf { it > 0 }?.toString(), b.notes, b.isbn,
-                b.publisher, b.publishedDate, b.pageCount?.toString(), localDate(b.addedAt), localDate(b.updatedAt),
+                b.publisher, b.publishedDate, b.pageCount?.toString(), localDate(b.addedAt), localDate(b.updatedAt), b.coverUrl,
             )
             writer.write(row.joinToString(",") { csvField(it.orEmpty()) } + "\r\n")
         }

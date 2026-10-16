@@ -1,5 +1,14 @@
 package app.shelfmark.data
 
+import java.util.concurrent.atomic.AtomicBoolean
+import java.io.IOException
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -14,7 +23,58 @@ class BookRepository(
 ) {
     val books: Flow<List<Book>> = dao.observeAll()
 
-    private val releaseFinder = ReleaseFinder(dao, NbCatalog())
+    private val releaseFinder = ReleaseFinder(dao, NbCatalog(), OlCatalog())
+    private val coverFinder = CoverFinder(NbCatalog())
+
+    /** Work that should finish even if the user leaves the screen that started it. */
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val repairingCovers = AtomicBoolean(false)
+    @Volatile private var repairCoversAgain = false
+
+    /**
+     * Looks for real covers, in the background, for books that have none or only a guessed
+     * link (imports, books scanned while a cover service was down). Covers show up as they
+     * are found. Books that can't be checked (offline) are tried again next time.
+     */
+    fun repairCovers() {
+        if (!repairingCovers.compareAndSet(false, true)) {
+            repairCoversAgain = true
+            return
+        }
+        background.launch {
+            try {
+                do {
+                    repairCoversAgain = false
+                    repairCoverBatch()
+                } while (repairCoversAgain)
+            } finally {
+                repairingCovers.set(false)
+            }
+        }
+    }
+
+    private suspend fun repairCoverBatch() = coroutineScope {
+        val pending = dao.getAll().filter {
+            it.photoPath == null && it.coverCheckedAt == 0L && (it.coverUrl == null || CoverFinder.isGuess(it.coverUrl))
+        }
+        val permits = Semaphore(4)
+        pending.map { book ->
+            launch {
+                permits.withPermit {
+                    val guess = book.coverUrl
+                    try {
+                        if (guess != null && imageExists(guess)) {
+                            dao.setCover(book.id, guess, System.currentTimeMillis())
+                        } else {
+                            dao.setCover(book.id, coverFinder.find(book), System.currentTimeMillis())
+                        }
+                    } catch (e: IOException) {
+                        // Offline: leave it for the next run.
+                    }
+                }
+            }
+        }.joinAll()
+    }
 
     /** The last search, kept while the app runs so revisiting the page is instant. */
     var lastReleases: ReleaseResult? = null
@@ -40,6 +100,7 @@ class BookRepository(
                 shelf = Shelf.WantToRead,
                 genres = Genres.encode(c.tags).ifEmpty { null },
                 profiledAt = System.currentTimeMillis(),
+                coverCheckedAt = System.currentTimeMillis(),
             ),
         )
     }
@@ -55,6 +116,7 @@ class BookRepository(
     /** Inserts or updates; returns the book's id. */
     suspend fun save(book: Book): Long {
         val rowId = dao.upsert(book.copy(updatedAt = System.currentTimeMillis()))
+        if (book.photoPath == null && (book.coverUrl == null || CoverFinder.isGuess(book.coverUrl))) repairCovers()
         return if (book.id == 0L) rowId else book.id
     }
 
@@ -94,6 +156,7 @@ class BookRepository(
             !duplicate
         }
         dao.insertAll(fresh)
+        if (fresh.isNotEmpty()) repairCovers()
         ImportResult(added = fresh.size, skipped = incoming.size - fresh.size)
     }
 

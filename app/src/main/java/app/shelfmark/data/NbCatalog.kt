@@ -3,14 +3,11 @@ package app.shelfmark.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.time.Instant
 
-/** A book in the Norwegian National Library's catalogue (api.nb.no), as search returns it. */
-data class NbRecord(
+/** A book found in a catalogue (NB.no or Open Library), as its search returns it. */
+data class CatalogRecord(
     val id: String,
     val title: String,
     val creators: List<String>,
@@ -21,6 +18,12 @@ data class NbRecord(
     val coverUrl: String?,
     /** When the library catalogued it; the best "how new is it" signal the API offers. */
     val indexedAt: Long,
+    /** ISO 639-2 code: "nob" for NB.no's Bokmål search, "eng" for English editions. */
+    val language: String = "nob",
+    /** Subjects that came with the search result (Open Library); NB.no's come with [NbDetails]. */
+    val subjects: List<String> = emptyList(),
+    /** Whether the catalogue already knows this is the first printing (Open Library's first publish year). */
+    val knownFirstEdition: Boolean = false,
 )
 
 /** The parts of a full catalogue record (MODS) that say what kind of book it is. */
@@ -39,7 +42,7 @@ data class NbDetails(
 class NbCatalog {
 
     /** Books matching [query] (NB search syntax), optionally limited to one year and Bokmål. */
-    suspend fun search(query: String, year: Int? = null, size: Int = 40, norwegianOnly: Boolean = true): List<NbRecord> =
+    suspend fun search(query: String, year: Int? = null, size: Int = 40, norwegianOnly: Boolean = true): List<CatalogRecord> =
         withContext(Dispatchers.IO) {
             val params = buildList {
                 add("q=" + enc(query))
@@ -51,7 +54,7 @@ class NbCatalog {
             parseSearch(httpGet("$BASE/items?" + params.joinToString("&")))
         }
 
-    suspend fun findByIsbn(isbn: String): NbRecord? =
+    suspend fun findByIsbn(isbn: String): CatalogRecord? =
         search("isbn:$isbn", size = 5, norwegianOnly = false).firstOrNull { it.isbn == isbn }
 
     suspend fun details(id: String): NbDetails = withContext(Dispatchers.IO) {
@@ -63,7 +66,7 @@ class NbCatalog {
 
         private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
-        fun parseSearch(json: String): List<NbRecord> {
+        fun parseSearch(json: String): List<CatalogRecord> {
             val items = JSONObject(json).optJSONObject("_embedded")?.optJSONArray("items") ?: return emptyList()
             return (0 until items.length()).mapNotNull { i ->
                 val item = items.getJSONObject(i)
@@ -73,7 +76,7 @@ class NbCatalog {
                 val creators = m.optJSONArray("creators")
                     ?.let { a -> (0 until a.length()).map { a.optString(it).trim() }.filter { it.isNotEmpty() } }
                     .orEmpty()
-                NbRecord(
+                CatalogRecord(
                     id = item.optString("id"),
                     title = title,
                     creators = creators,
@@ -120,20 +123,6 @@ class NbCatalog {
             .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'")
             .replace(Regex("&#(\\d+);")) { it.groupValues[1].toInt().toChar().toString() }
             .replace("&amp;", "&")
-
-        private fun httpGet(url: String): String {
-            val conn = URL(url).openConnection() as HttpURLConnection
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 15_000
-            conn.setRequestProperty("User-Agent", "Shelfmark/1.0 (Android reading log)")
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) throw IOException("HTTP $code from $url")
-                return conn.inputStream.bufferedReader().use { it.readText() }
-            } finally {
-                conn.disconnect()
-            }
-        }
     }
 }
 

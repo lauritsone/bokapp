@@ -143,14 +143,14 @@
 
     <!-- New releases -->
     <string name="releases_title">New releases for you</string>
-    <string name="releases_entry_subtitle">New books by your authors and publishers, with a match score</string>
+    <string name="releases_entry_subtitle">New Norwegian and English books for your taste, with a match score</string>
     <string name="releases_learning">Learning your taste… %1$d of %2$d books</string>
     <string name="releases_searching">Looking for new books…</string>
     <string name="releases_reading">Reading about new books… %1$d of %2$d</string>
     <string name="releases_offline">Couldn\'t reach the library catalogue. Check your connection and try again.</string>
     <string name="releases_empty">No new books found right now. Try again later.</string>
     <string name="releases_few_books">Rate a few more books for sharper matches.</string>
-    <string name="releases_source">New Norwegian books from the National Library\'s catalogue (nb.no), scored against your library.</string>
+    <string name="releases_source">New Norwegian books from the National Library\'s catalogue (nb.no) and new English books from Open Library, scored against your library.</string>
     <string name="refresh">Refresh</string>
     <string name="try_again">Try again</string>
     <string name="match_percent">%1$d%% match</string>
@@ -163,4 +163,30 @@
     <string name="reason_publisher">From %1$s, a publisher you read</string>
     <string name="add_to_want">Add to Want to read</string>
     <string name="added_to_want">Added to Want to read</string>
+
+    <!-- Genre names for match reasons -->
+    <string name="genre_crime">Crime</string>
+    <string name="genre_fantasy">Fantasy</string>
+    <string name="genre_scifi">Science fiction</string>
+    <string name="genre_horror">Horror</string>
+    <string name="genre_romance">Romance</string>
+    <string name="genre_historical">Historical fiction</string>
+    <string name="genre_novel">Novels</string>
+    <string name="genre_shortstories">Short stories</string>
+    <string name="genre_poetry">Poetry</string>
+    <string name="genre_children">Children\'s books</string>
+    <string name="genre_youngadult">Young adult</string>
+    <string name="genre_biography">Biography</string>
+    <string name="genre_history">History</string>
+    <string name="genre_essays">Essays</string>
+    <string name="genre_humor">Humour</string>
+    <string name="genre_selfhelp">Self-help</string>
+    <string name="genre_cooking">Cooking</string>
+    <string name="genre_travel">Travel</string>
+    <string name="genre_nature">Nature</string>
+    <string name="genre_sport">Sport</string>
+    <string name="genre_comics">Comics</string>
+    <string name="lang_all">All</string>
+    <string name="lang_norwegian">Norwegian</string>
+    <string name="lang_english">English</string>
 </resources>
