@@ -247,7 +247,7 @@ private fun DetailContent(
             book.pageCount?.let { add(R.string.pages to it.toString()) }
             book.isbn?.let { add(R.string.isbn to it) }
             add(R.string.added to formatDate(book.addedAt, locale))
-            book.finishedAt?.let { add(R.string.finished_on to formatDate(it, locale)) }
+            book.finishedAt?.takeIf { book.shelf == Shelf.Read }?.let { add(R.string.finished_on to formatDate(it, locale)) }
         }
         Spacer(Modifier.height(36.dp))
         Text(stringResource(R.string.details), style = MaterialTheme.typography.titleLarge)

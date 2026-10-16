@@ -2,7 +2,10 @@ package app.shelfmark.ui.components
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,7 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.shelfmark.R
 import app.shelfmark.data.Shelf
@@ -81,12 +84,14 @@ fun ShelfBadge(shelf: Shelf, modifier: Modifier = Modifier) {
 /** Read · Reading · Want to read, as one segmented control; the chosen shelf takes its colour. */
 @Composable
 fun ShelfSelector(shelf: Shelf, onChange: (Shelf) -> Unit, modifier: Modifier = Modifier) {
-    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
+    // Equal heights when a label wraps onto two lines at large text sizes.
+    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         ShelfOrder.forEachIndexed { index, option ->
             val colors = option.colors()
             SegmentedButton(
                 selected = option == shelf,
                 onClick = { onChange(option) },
+                modifier = Modifier.fillMaxHeight(),
                 shape = SegmentedButtonDefaults.itemShape(index, ShelfOrder.size),
                 colors = SegmentedButtonDefaults.colors(
                     activeContainerColor = colors.container,
@@ -97,8 +102,7 @@ fun ShelfSelector(shelf: Shelf, onChange: (Shelf) -> Unit, modifier: Modifier = 
                     Text(
                         stringResource(option.label),
                         style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                     )
                 },
             )

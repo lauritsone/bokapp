@@ -1,6 +1,7 @@
 package app.shelfmark.ui.library
 
 import app.shelfmark.R
+import java.text.Collator
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -56,8 +57,9 @@ class LibraryViewModel(private val repo: BookRepository) : ViewModel() {
             SortMode.Rating -> filtered.sortedWith(
                 compareByDescending<Book> { it.rating }.thenByDescending { it.addedAt },
             )
-            SortMode.Title -> filtered.sortedBy { it.title.lowercase() }
-            SortMode.Author -> filtered.sortedBy { it.authors.lowercase() }
+            // The phone's alphabet: in Norwegian Æ, Ø and Å come last, and É sorts with E.
+            SortMode.Title -> filtered.sortedWith(compareBy(Collator.getInstance()) { it.title })
+            SortMode.Author -> filtered.sortedWith(compareBy(Collator.getInstance()) { it.authors })
         }
         val rated = all.filter { it.shelf == Shelf.Read && it.rating > 0 }
         LibraryState(

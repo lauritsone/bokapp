@@ -6,7 +6,13 @@ import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
 
 class ImportException(message: String) : Exception(message)
 
@@ -177,22 +183,51 @@ object LibraryImport {
 
     private fun cleanIsbn(value: String?): String? {
         val raw = value?.filter { it.isDigit() || it == 'X' || it == 'x' }?.ifEmpty { null } ?: return null
-        return Isbn.normalize(raw) ?: raw
+        // Excel turns long numbers into 9,78821E+12; what's left of those isn't an ISBN.
+        return Isbn.normalize(raw) ?: raw.takeIf { it.length == 10 || it.length == 13 }
     }
 
-    /** Accepts ISO instants, epoch milliseconds and dates like 2024-05-01 or 2024/05/01. */
-    private fun parseTime(value: String?): Long? {
-        if (value == null) return null
+    private val localTimes = listOf("yyyy-MM-dd HH:mm[:ss]", "yyyy-MM-dd'T'HH:mm[:ss]", "d.M.yyyy H:mm[:ss]")
+        .map(DateTimeFormatter::ofPattern)
+    private val localDates = listOf("yyyy-MM-dd", "yyyy/MM/dd", "d.M.yyyy").map(DateTimeFormatter::ofPattern)
+
+    /**
+     * Accepts ISO instants, epoch milliseconds, local times like 2024-05-01 14:30:00, and
+     * dates like 2024-05-01, 2024/05/01 or 01.05.2024 (Norwegian Excel).
+     */
+    private fun parseTime(raw: String?): Long? {
+        val value = raw?.trim()?.ifEmpty { null } ?: return null
         value.toLongOrNull()?.let { return it }
         try {
             return Instant.parse(value).toEpochMilli()
         } catch (_: DateTimeParseException) {
         }
-        return try {
-            LocalDate.parse(value.take(10).replace('/', '-'))
-                .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        } catch (_: DateTimeParseException) {
-            null
+        val zone = ZoneId.systemDefault()
+        for (f in localTimes) {
+            try {
+                return LocalDateTime.parse(value, f).atZone(zone).toInstant().toEpochMilli()
+            } catch (_: DateTimeParseException) {
+            }
         }
+        for (f in localDates) {
+            try {
+                return LocalDate.parse(value.substringBefore(' '), f).atStartOfDay(zone).toInstant().toEpochMilli()
+            } catch (_: DateTimeParseException) {
+            }
+        }
+        return null
+    }
+
+    /**
+     * Reads a file's bytes as text: UTF-8 when the bytes are valid UTF-8, otherwise
+     * Windows-1252, which Norwegian Excel uses for "CSV (semicolon separated)".
+     */
+    fun decode(bytes: ByteArray): String = try {
+        Charsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(bytes)).toString()
+    } catch (_: CharacterCodingException) {
+        String(bytes, Charset.forName("windows-1252"))
     }
 }

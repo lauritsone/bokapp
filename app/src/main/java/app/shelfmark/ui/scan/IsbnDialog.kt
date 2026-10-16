@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.shelfmark.data.Isbn
@@ -52,7 +53,7 @@ fun IsbnDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
                         if (showError) Text(stringResource(R.string.isbn_invalid))
                     },
                     textStyle = MaterialTheme.typography.bodyLarge,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { isbn?.let(onSubmit) }),
                 )
             }

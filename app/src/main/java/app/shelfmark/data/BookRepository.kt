@@ -2,8 +2,11 @@ package app.shelfmark.data
 
 import java.util.concurrent.atomic.AtomicBoolean
 import java.io.IOException
+import org.json.JSONException
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.coroutineScope
@@ -70,6 +73,8 @@ class BookRepository(
                         }
                     } catch (e: IOException) {
                         // Offline: leave it for the next run.
+                    } catch (e: JSONException) {
+                        // An unexpected answer from a cover service: try again next run.
                     }
                 }
             }
@@ -84,10 +89,21 @@ class BookRepository(
     suspend fun findReleases(onProgress: (ReleaseProgress) -> Unit): ReleaseResult =
         withContext(Dispatchers.IO) { releaseFinder.find(onProgress) }.also { lastReleases = it }
 
-    /** Puts a suggested new book on the Want to read shelf; returns its id. */
-    suspend fun addToWantToRead(match: Match): Long {
+    /** Suggestions already put on Want to read, so they still show as added on a later visit. */
+    val addedReleases: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
+    private val adding = Mutex()
+
+    /**
+     * Puts a suggested new book on the Want to read shelf; returns its id. A book that is
+     * already in the library (a double tap, or added earlier) isn't added again.
+     */
+    suspend fun addToWantToRead(match: Match): Long = adding.withLock {
         val c = match.candidate
-        return save(
+        addedReleases += c.record.id
+        val existing = c.record.isbn?.let { dao.findByIsbn(it) }
+            ?: dao.getAll().firstOrNull { nameKey(it) == foldText(c.record.title) + "|" + foldText(c.author) }
+        if (existing != null) return existing.id
+        save(
             Book(
                 title = c.record.title,
                 authors = c.author,
@@ -118,7 +134,12 @@ class BookRepository(
         val now = System.currentTimeMillis()
         val previousShelf = if (book.id == 0L) null else dao.get(book.id)?.shelf
         val finished = previousShelf != null && previousShelf != Shelf.Read && book.shelf == Shelf.Read
-        val rowId = dao.upsert(book.copy(updatedAt = now, finishedAt = if (finished) now else book.finishedAt))
+        val finishedAt = when {
+            finished -> now
+            book.shelf != Shelf.Read -> null
+            else -> book.finishedAt
+        }
+        val rowId = dao.upsert(book.copy(updatedAt = now, finishedAt = finishedAt))
         if (book.photoPath == null && (book.coverUrl == null || CoverFinder.isGuess(book.coverUrl))) repairCovers()
         return if (book.id == 0L) rowId else book.id
     }
@@ -160,7 +181,7 @@ class BookRepository(
      * @throws ImportException if the file can't be read as either format.
      */
     suspend fun import(input: InputStream): ImportResult = withContext(Dispatchers.IO) {
-        val text = input.use { it.readBytes().toString(Charsets.UTF_8) }
+        val text = LibraryImport.decode(input.use { it.readBytes() })
         val incoming = LibraryImport.parse(text)
         val existing = dao.getAll()
         val seenIsbns = existing.mapNotNull { it.isbn }.toMutableSet()

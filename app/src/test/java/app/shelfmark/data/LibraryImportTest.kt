@@ -13,7 +13,7 @@ class LibraryImportTest {
         Book(
             title = "Snømannen", authors = "Jo Nesbø", rating = 4, shelf = Shelf.Read,
             notes = "Spennende, \"mørk\"\nAndre linje", isbn = "9788203362446", publisher = "Aschehoug",
-            publishedDate = "2017", pageCount = 445, addedAt = 1_700_000_000_000, finishedAt = 1_700_500_000_000,
+            publishedDate = "2017", pageCount = 445, description = "Harry Hole, Oslo, \"snø\"", addedAt = 1_700_000_000_000, finishedAt = 1_700_500_000_000,
             coverUrl = "https://www.nb.no/services/image/resolver/URN:NBN:no-nb_digibok_2023071907012_C1/full/0,200/0/native.jpg",
         ),
         Book(title = "Pippi Långstrump", authors = "Astrid Lindgren", shelf = Shelf.WantToRead, ignoreForSuggestions = true),
@@ -26,7 +26,7 @@ class LibraryImportTest {
         return out.toString(Charsets.UTF_8.name())
     }
 
-    private fun assertSameBooks(imported: List<Book>, keepsDescriptionFields: Boolean) {
+    private fun assertSameBooks(imported: List<Book>) {
         assertEquals(3, imported.size)
         val sno = imported[0]
         assertEquals("Snømannen", sno.title)
@@ -45,20 +45,36 @@ class LibraryImportTest {
         assertEquals(Shelf.Reading, imported[2].shelf)
         assertEquals("Penguin, UK", imported[2].publisher)
         assertNull(imported[2].finishedAt)
-        if (keepsDescriptionFields) {
-            assertEquals(1_700_000_000_000, sno.addedAt)
-            assertEquals(1_700_500_000_000, sno.finishedAt)
-        } else {
-            // CSV keeps the day, not the time.
-            assertEquals(localDay(1_700_500_000_000), localDay(sno.finishedAt!!))
-        }
+        assertEquals(books[0].description, sno.description)
+        // CSV keeps times to the second, so books added the same day keep their order.
+        assertEquals(1_700_000_000_000, sno.addedAt)
+        assertEquals(1_700_500_000_000, sno.finishedAt)
     }
 
     private fun localDay(millis: Long) = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
 
-    @Test fun jsonBackupRoundTrips() = assertSameBooks(LibraryImport.parse(exported(ExportFormat.Json)), true)
+    @Test fun jsonBackupRoundTrips() = assertSameBooks(LibraryImport.parse(exported(ExportFormat.Json)))
 
-    @Test fun csvExportRoundTrips() = assertSameBooks(LibraryImport.parse(exported(ExportFormat.Csv)), false)
+    @Test fun csvExportRoundTrips() = assertSameBooks(LibraryImport.parse(exported(ExportFormat.Csv)))
+
+    @Test fun csvExportKeepsIsbnAsTextForExcel() =
+        assertTrue(exported(ExportFormat.Csv).contains(",=\"9788203362446\","))
+
+    @Test fun readsWindows1252FromNorwegianExcel() {
+        val bytes = "Tittel;Forfatter\r\nSnømannen;Jo Nesbø\r\n".toByteArray(charset("windows-1252"))
+        val books = LibraryImport.parse(LibraryImport.decode(bytes))
+        assertEquals("Snømannen", books.single().title)
+        assertEquals("Jo Nesbø", books.single().authors)
+        assertEquals("Blåbær", LibraryImport.decode("Blåbær".toByteArray()))
+    }
+
+    @Test fun readsNorwegianDatesAndDropsExcelMangledIsbns() {
+        val csv = "title;isbn;added;finished\r\nSult;9,78821E+12;16.10.2026;1.2.2025 14:05\r\n"
+        val book = LibraryImport.parse(csv).single()
+        assertNull(book.isbn)
+        assertEquals(java.time.LocalDate.of(2026, 10, 16), localDay(book.addedAt))
+        assertEquals(java.time.LocalDate.of(2025, 2, 1), localDay(book.finishedAt!!))
+    }
 
     @Test fun readsSemicolonCsvWithNorwegianHeaders() {
         val csv = "Tittel;Forfatter;Hylle;Karakter\r\nSult;Knut Hamsun;Vil lese;\r\nMarkens grøde;Knut Hamsun;Lest;5\r\n"

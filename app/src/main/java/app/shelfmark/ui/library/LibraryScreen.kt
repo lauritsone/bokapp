@@ -24,6 +24,7 @@ import app.shelfmark.data.LibraryExport
 import app.shelfmark.data.ExportFormat
 import app.shelfmark.data.BookRepository
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
@@ -216,28 +217,35 @@ private fun LibraryHeader(
     onExport: (ExportFormat) -> Unit,
     onImport: () -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.Top) {
-        Column(Modifier.weight(1f)) {
+    // With large text the title would break mid-word beside the buttons.
+    val titleStyle = if (LocalDensity.current.fontScale > 1.3f) {
+        MaterialTheme.typography.headlineMedium
+    } else {
+        MaterialTheme.typography.displaySmall
+    }
+    Column {
+        Row(verticalAlignment = Alignment.Top) {
             Text(
                 stringResource(R.string.your_library),
-                style = MaterialTheme.typography.displaySmall,
+                style = titleStyle,
                 color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
             )
+            LibraryMenu(canExport = state.totalCount > 0, onExport = onExport, onImport = onImport, modifier = Modifier.padding(top = 2.dp))
             if (state.totalCount > 0) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    summaryLine(state),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Spacer(Modifier.width(8.dp))
+                FilledTonalIconButton(onClick = onAddByHand, modifier = Modifier.padding(top = 2.dp)) {
+                    Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.add_by_hand))
+                }
             }
         }
-        LibraryMenu(canExport = state.totalCount > 0, onExport = onExport, onImport = onImport, modifier = Modifier.padding(top = 2.dp))
         if (state.totalCount > 0) {
-            Spacer(Modifier.width(8.dp))
-            FilledTonalIconButton(onClick = onAddByHand, modifier = Modifier.padding(top = 2.dp)) {
-                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.add_by_hand))
-            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                summaryLine(state),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -578,12 +586,17 @@ private fun ShelfTabs(state: LibraryState, onChange: (Shelf) -> Unit, modifier: 
         ShelfOrder.forEach { shelf ->
             val colors = shelf.colors()
             val count = state.shelfCounts[shelf] ?: 0
+            // Tab's icon-and-text layout has a fixed height that clips two-line labels at large text sizes.
             Tab(
                 selected = shelf == state.shelf,
                 onClick = { onChange(shelf) },
                 selectedContentColor = colors.content,
                 unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                icon = {
+            ) {
+                Column(
+                    Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     BadgedBox(
                         badge = {
                             if (count > 0) {
@@ -591,16 +604,14 @@ private fun ShelfTabs(state: LibraryState, onChange: (Shelf) -> Unit, modifier: 
                             }
                         },
                     ) { Icon(shelf.icon, contentDescription = null) }
-                },
-                text = {
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         stringResource(shelf.label),
                         style = MaterialTheme.typography.labelLarge,
                         textAlign = TextAlign.Center,
-                        maxLines = 2,
                     )
-                },
-            )
+                }
+            }
         }
     }
 }

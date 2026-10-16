@@ -22,7 +22,7 @@ sealed interface ReleasesState {
 class ReleasesViewModel(private val repo: BookRepository) : ViewModel() {
 
     private val _state = MutableStateFlow<ReleasesState>(
-        repo.lastReleases?.let { ReleasesState.Loaded(it) } ?: ReleasesState.Loading(),
+        repo.lastReleases?.let { ReleasesState.Loaded(it, repo.addedReleases.toSet()) } ?: ReleasesState.Loading(),
     )
     val state: StateFlow<ReleasesState> = _state.asStateFlow()
 
@@ -34,7 +34,10 @@ class ReleasesViewModel(private val repo: BookRepository) : ViewModel() {
         _state.value = ReleasesState.Loading()
         viewModelScope.launch {
             _state.value = try {
-                ReleasesState.Loaded(repo.findReleases { p -> _state.update { if (it is ReleasesState.Loading) ReleasesState.Loading(p) else it } })
+                ReleasesState.Loaded(
+                    repo.findReleases { p -> _state.update { if (it is ReleasesState.Loading) ReleasesState.Loading(p) else it } },
+                    repo.addedReleases.toSet(),
+                )
             } catch (e: IOException) {
                 ReleasesState.Offline
             }
@@ -42,6 +45,8 @@ class ReleasesViewModel(private val repo: BookRepository) : ViewModel() {
     }
 
     fun addToWantToRead(match: Match) {
+        val id = match.candidate.record.id
+        if ((_state.value as? ReleasesState.Loaded)?.added?.contains(id) == true) return
         viewModelScope.launch {
             repo.addToWantToRead(match)
             _state.update { s -> if (s is ReleasesState.Loaded) s.copy(added = s.added + match.candidate.record.id) else s }

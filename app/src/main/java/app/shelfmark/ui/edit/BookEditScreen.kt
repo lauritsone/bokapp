@@ -215,7 +215,7 @@ fun BookEditScreen(
                                 enabled = !state.loading && !book.isbn.isNullOrBlank(),
                             ) { Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.look_up_isbn)) }
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { vm.lookupIsbn() }),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

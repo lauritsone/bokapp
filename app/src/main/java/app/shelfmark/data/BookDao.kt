@@ -36,9 +36,9 @@ interface BookDao {
     @Query("UPDATE books SET notes = :notes, updatedAt = :now WHERE id = :id")
     suspend fun setNotes(id: Long, notes: String, now: Long)
 
-    /** Moving a book onto Read from another shelf counts as finishing it now. */
+    /** Moving a book onto Read from another shelf counts as finishing it now; moving it off Read un-finishes it. */
     @Query(
-        "UPDATE books SET finishedAt = CASE WHEN :shelf = 0 AND shelf != 0 THEN :now ELSE finishedAt END, " +
+        "UPDATE books SET finishedAt = CASE WHEN :shelf = 0 AND shelf != 0 THEN :now WHEN :shelf != 0 THEN NULL ELSE finishedAt END, " +
             "shelf = :shelf, updatedAt = :now WHERE id = :id",
     )
     suspend fun setShelf(id: Long, shelf: Shelf, now: Long)

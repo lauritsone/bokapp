@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
+import org.json.JSONException
 import java.net.URLEncoder
 
 
@@ -21,6 +22,9 @@ class CoverFinder(private val nb: NbCatalog) {
         suspend fun attempt(block: suspend () -> String?): String? = try {
             block().also { reached = true }
         } catch (e: IOException) {
+            null
+        } catch (e: JSONException) {
+            reached = true
             null
         }
 

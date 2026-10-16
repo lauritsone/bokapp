@@ -6,6 +6,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.IOException
+import org.json.JSONException
 import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -71,6 +72,8 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
             } catch (e: IOException) {
                 failures.incrementAndGet()
                 emptyList()
+            } catch (e: JSONException) {
+                emptyList()
             }
         }.flatten()
         if (failures.get() == searches.size) throw IOException("The library catalogue couldn't be reached")
@@ -90,6 +93,8 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
             val details = try {
                 cachedDetails(record)
             } catch (e: IOException) {
+                null
+            } catch (e: JSONException) {
                 null
             }
             onProgress(ReleaseProgress.ReadingDetails(done.incrementAndGet(), fresh.size))
@@ -117,6 +122,8 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
                 dao.setGenres(book.id, tags.takeIf { it.isNotEmpty() }?.let(Genres::encode), System.currentTimeMillis())
             } catch (e: IOException) {
                 // Offline or catalogue hiccup: try this book again next time.
+            } catch (e: JSONException) {
+                // An unexpected answer: try this book again next time.
             }
             onProgress(ReleaseProgress.LearningTaste(done.incrementAndGet(), pending.size))
         }
@@ -129,6 +136,8 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         val firstYears = try {
             firstYearsCache[author] ?: firstYears(author).also { firstYearsCache[author] = it }
         } catch (e: IOException) {
+            return false
+        } catch (e: JSONException) {
             return false
         }
         val first = firstYears[titleKey(c.record.title)] ?: return false

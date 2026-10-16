@@ -6,6 +6,8 @@ import java.io.OutputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 enum class ExportFormat(val mimeType: String, val extension: String) {
     /** Opens in Excel, Google Sheets or Numbers. */
@@ -29,7 +31,7 @@ object LibraryExport {
     private fun writeCsv(books: List<Book>, out: OutputStream) {
         val header = listOf(
             "title", "authors", "shelf", "rating", "notes", "isbn",
-            "publisher", "published", "pages", "added", "updated", "cover_url", "finished", "ignore_for_suggestions",
+            "publisher", "published", "pages", "added", "updated", "cover_url", "finished", "ignore_for_suggestions", "description",
         )
         val writer = out.bufferedWriter(Charsets.UTF_8)
         // The byte-order mark makes Excel read æ, ø and å correctly.
@@ -37,11 +39,13 @@ object LibraryExport {
         writer.write(header.joinToString(",") + "\r\n")
         for (b in books) {
             val row = listOf(
-                b.title, b.authors, b.shelf.key, b.rating.takeIf { it > 0 }?.toString(), b.notes, b.isbn,
-                b.publisher, b.publishedDate, b.pageCount?.toString(), localDate(b.addedAt), localDate(b.updatedAt), b.coverUrl,
-                b.finishedAt?.let(::localDate), if (b.ignoreForSuggestions) "yes" else null,
-            )
-            writer.write(row.joinToString(",") { csvField(it.orEmpty()) } + "\r\n")
+                b.title, b.authors, b.shelf.key, b.rating.takeIf { it > 0 }?.toString(), b.notes, null,
+                b.publisher, b.publishedDate, b.pageCount?.toString(), localTime(b.addedAt), localTime(b.updatedAt), b.coverUrl,
+                b.finishedAt?.let(::localTime), if (b.ignoreForSuggestions) "yes" else null, b.description,
+            ).map { csvField(it.orEmpty()) }.toMutableList()
+            // Written as ="978…" so Excel keeps it as text instead of 9,78821E+12.
+            b.isbn?.let { row[5] = "=\"$it\"" }
+            writer.write(row.joinToString(",") + "\r\n")
         }
         writer.flush()
     }
@@ -78,8 +82,10 @@ object LibraryExport {
         writer.flush()
     }
 
-    private fun localDate(epochMillis: Long) =
-        Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate().toString()
+    /** Local date and time to the second, so books added the same day keep their order. */
+    private fun localTime(epochMillis: Long) =
+        Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
+            .truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 
     /** Quotes a field when it holds a comma, quote or line break (RFC 4180). */
     private fun csvField(value: String): String =

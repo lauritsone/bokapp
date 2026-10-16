@@ -111,15 +111,32 @@ class BookEditViewModel(
         if (book.title.isBlank() || _state.value.saving) return
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
+            val isbn = book.isbn?.let { Isbn.normalize(it) ?: it.trim().ifBlank { null } }
+            // A typed ISBN that's already in the library, without a lookup first.
+            val existing = isbn?.let { repo.findByIsbn(it) }
+            if (existing != null && existing.id != book.id) {
+                _state.update { it.copy(saving = false, duplicateOf = existing.id) }
+                return@launch
+            }
             val id = repo.save(
                 book.copy(
                     title = book.title.trim(),
                     authors = book.authors.trim(),
                     notes = book.notes.trim(),
-                    isbn = book.isbn?.let { Isbn.normalize(it) ?: it.trim().ifBlank { null } },
+                    isbn = isbn,
                 ),
             )
+            savedPhoto = true
             _state.update { it.copy(saving = false, savedId = id) }
         }
+    }
+
+    // A cover photo taken for a new book that is never saved would stay in storage.
+    private val newPhoto = photoPath.takeIf { bookId == 0L }
+    private var savedPhoto = false
+
+    override fun onCleared() {
+        val photo = newPhoto ?: return
+        if (!savedPhoto && _state.value.book.photoPath == photo) java.io.File(photo).delete()
     }
 }
