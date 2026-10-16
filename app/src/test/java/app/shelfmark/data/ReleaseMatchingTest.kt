@@ -120,6 +120,20 @@ class ReleaseMatchingTest {
         assertTrue(TasteProfile(cookbookFan.map { it.copy(ignoreForSuggestions = false) }).score(baking).percent > left.score(baking).percent)
     }
 
+    @Test fun genresTheUserDoesntReadCountAgainstABook() {
+        val feelgood = TasteProfile(listOf(
+            Book(title = "Det lille bakeriet", authors = "Jenny Colgan", rating = 5, genres = Genres.encode(setOf("feelgood", "novel", Genres.FICTION))),
+        ))
+        fun score(vararg genres: String) = feelgood.score(candidate("Ny Forfatter", null, genres.toList(), true)).percent
+        val cosy = score("Feelgood", "Romaner")
+        val plain = score("Romaner")
+        val romance = score("Kjærlighetsromaner")
+        val crime = score("Krim", "Romaner")
+        assertTrue("$cosy > $plain", cosy > plain)
+        assertTrue("$romance > $crime (romance is close to feelgood)", romance > crime)
+        assertTrue("$plain > $crime", plain > crime)
+    }
+
     @Test fun picksAuthorsAndPublishersToSearch() {
         assertEquals("Jo Nesbø", profile.favouriteAuthors(3).first())
         assertFalse("Hellstrøm" in profile.favouriteAuthors(10))

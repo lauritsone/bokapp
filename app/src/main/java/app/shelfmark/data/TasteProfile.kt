@@ -99,17 +99,25 @@ class TasteProfile(books: List<Book>) {
 
         // Genre: how much the user reads the candidate's best-matching genres, relative to their top genre.
         val maxGenre = genreWeights.values.maxOrNull()?.takeIf { it > 0 }
+        fun share(tag: String) = if (maxGenre == null) 0.0 else ((genreWeights[tag] ?: 0.0) / maxGenre).coerceIn(0.0, 1.0)
         val genreHits = (c.tags - setOf(Genres.FICTION, Genres.NONFICTION))
-            .map { tag -> tag to (if (maxGenre == null) 0.0 else ((genreWeights[tag] ?: 0.0) / maxGenre).coerceIn(0.0, 1.0)) }
+            .map { tag -> tag to share(tag) }
             .sortedByDescending { it.second }
+        // A close genre (romance for a feelgood reader) earns half credit.
+        val credit = genreHits.map { (tag, a) ->
+            tag to maxOf(a, 0.5 * (Genres.related[tag]?.maxOfOrNull(::share) ?: 0.0))
+        }
         // Nearly everything is a "novel", so it counts for less; a specific genre the
         // user reads (crime, fantasy …) adds a bonus on top.
         val genreScore = when {
             maxGenre == null || genreHits.isEmpty() -> 0.25
             else -> {
-                val best = genreHits.maxOf { (tag, a) -> if (tag == "novel") a * 0.7 else a }
-                val bestSpecific = genreHits.filter { it.first != "novel" }.maxOfOrNull { it.second } ?: 0.0
-                (best + 0.3 * bestSpecific).coerceAtMost(1.0)
+                val best = credit.maxOf { (tag, a) -> if (tag == "novel") a * 0.7 else a }
+                val bestSpecific = credit.filter { it.first != "novel" }.maxOfOrNull { it.second } ?: 0.0
+                val score = (best + 0.3 * bestSpecific).coerceAtMost(1.0)
+                // A crime novel is a novel too, but not one for someone who never reads crime.
+                val unread = credit.any { (tag, a) -> Genres.isSpecific(tag) && a < 0.1 }
+                if (unread && bestSpecific < 0.3) score * 0.4 else score
             }
         }
         // "Novel" says little; name a more telling genre when one matches too.

@@ -9,7 +9,7 @@ object Genres {
     const val NONFICTION = "nonfiction"
 
     /** When the tagging rules last changed; books tagged before this are tagged again. */
-    const val RULES_SINCE = 1_792_108_800_000L // 2026-10-16
+    const val RULES_SINCE = 1_792_143_000_000L // 2026-10-16 09:30 UTC
 
     /** Tag to the word stems (folded) that signal it. A genre may hit several. */
     private val stems = linkedMapOf(
@@ -17,6 +17,7 @@ object Genres {
         "fantasy" to listOf("fantasy"),
         "scifi" to listOf("science fiction", "sci fi", "dystop", "framtidsroman", "fremtidsroman"),
         "horror" to listOf("grosser", "horror", "skrekk"),
+        "feelgood" to listOf("feelgood", "feel good", "chick lit"),
         "romance" to listOf("romance", "romantikk", "kjaerlighetsroman", "love stories"),
         "historical" to listOf("historiske romaner", "historical fiction", "historisk roman"),
         // Not plain "roman": that would also catch "romance" and "romantikk".
@@ -69,7 +70,21 @@ object Genres {
         return tags
     }
 
-    private val fictionTags = setOf("crime", "fantasy", "scifi", "horror", "romance", "historical", "novel", "shortstories")
+    /**
+     * Whether [tag] is a genre we know (crime, fantasy …) rather than the catch-all "novel"
+     * or a word copied from the catalogue as is.
+     */
+    fun isSpecific(tag: String) = tag != "novel" && tag in stems
+
+    /** Genres close enough that liking one says something about the other. */
+    val related: Map<String, Set<String>> = mapOf(
+        "feelgood" to setOf("romance"),
+        "romance" to setOf("feelgood"),
+        "fantasy" to setOf("scifi"),
+        "scifi" to setOf("fantasy"),
+    )
+
+    private val fictionTags = setOf("feelgood", "crime", "fantasy", "scifi", "horror", "romance", "historical", "novel", "shortstories")
 
     fun encode(tags: Set<String>): String = tags.sorted().joinToString("|")
 
