@@ -1,5 +1,7 @@
 package app.shelfmark.ui.library
 
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.AutoAwesome
 import app.shelfmark.data.ImportException
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
@@ -105,6 +107,7 @@ fun LibraryScreen(
     onScan: (Shelf) -> Unit,
     onAddByHand: (Shelf) -> Unit,
     onOpen: (Long) -> Unit,
+    onReleases: () -> Unit,
 ) {
     val repo = rememberRepository()
     val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(repo) } })
@@ -140,6 +143,9 @@ fun LibraryScreen(
         ) {
             item(key = "header") {
                 LibraryHeader(state, onAddByHand = { onAddByHand(state.shelf) }, onExport = export, onImport = import)
+            }
+            if (state.totalCount > 0 && !state.searching) {
+                item(key = "releases") { ReleasesCard(onReleases, Modifier.padding(top = 20.dp)) }
             }
             if (state.totalCount > 0) {
                 item(key = "shelves") {
@@ -566,6 +572,36 @@ private fun ShelfTabs(state: LibraryState, onChange: (Shelf) -> Unit, modifier: 
                 },
             )
         }
+    }
+}
+
+/** The way into "New releases for you". */
+@Composable
+private fun ReleasesCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.releases_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                stringResource(R.string.releases_entry_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+            )
+        }
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
 

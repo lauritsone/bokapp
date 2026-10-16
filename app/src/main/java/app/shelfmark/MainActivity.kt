@@ -16,6 +16,7 @@ import app.shelfmark.data.Shelf
 import app.shelfmark.ui.detail.BookDetailScreen
 import app.shelfmark.ui.edit.BookEditScreen
 import app.shelfmark.ui.library.LibraryScreen
+import app.shelfmark.ui.releases.ReleasesScreen
 import app.shelfmark.ui.scan.ScanScreen
 import app.shelfmark.ui.theme.ShelfmarkTheme
 
@@ -34,6 +35,7 @@ class MainActivity : AppCompatActivity() {
 
 private object Routes {
     const val LIBRARY = "library"
+    const val RELEASES = "releases"
     const val SCAN = "scan?shelf={shelf}"
     const val DETAIL = "book/{id}"
     const val EDIT = "edit?id={id}&isbn={isbn}&photo={photo}&shelf={shelf}"
@@ -61,7 +63,12 @@ private fun ShelfmarkNavHost() {
                 onScan = { shelf -> nav.navigate(Routes.scan(shelf)) },
                 onAddByHand = { shelf -> nav.navigate(Routes.newByHand(shelf)) },
                 onOpen = { id -> nav.navigate(Routes.detail(id)) },
+                onReleases = { nav.navigate(Routes.RELEASES) },
             )
+        }
+
+        composable(Routes.RELEASES) {
+            ReleasesScreen(onBack = { nav.popBackStack() })
         }
 
         composable(Routes.SCAN, arguments = listOf(shelfArgument)) { entry ->

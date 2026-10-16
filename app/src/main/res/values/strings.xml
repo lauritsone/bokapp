@@ -140,4 +140,27 @@
     </plurals>
     <string name="import_nothing">No books found in that file.</string>
     <string name="import_failed">Couldn\'t read that file. Choose a Shelfmark backup (JSON) or a CSV file with a title column.</string>
+
+    <!-- New releases -->
+    <string name="releases_title">New releases for you</string>
+    <string name="releases_entry_subtitle">New books by your authors and publishers, with a match score</string>
+    <string name="releases_learning">Learning your taste… %1$d of %2$d books</string>
+    <string name="releases_searching">Looking for new books…</string>
+    <string name="releases_reading">Reading about new books… %1$d of %2$d</string>
+    <string name="releases_offline">Couldn\'t reach the library catalogue. Check your connection and try again.</string>
+    <string name="releases_empty">No new books found right now. Try again later.</string>
+    <string name="releases_few_books">Rate a few more books for sharper matches.</string>
+    <string name="releases_source">New Norwegian books from the National Library\'s catalogue (nb.no), scored against your library.</string>
+    <string name="refresh">Refresh</string>
+    <string name="try_again">Try again</string>
+    <string name="match_percent">%1$d%% match</string>
+    <string name="reason_author">By %1$s, whom you rated %2$d★</string>
+    <string name="reason_author_unrated">By %1$s, an author on your shelves</string>
+    <plurals name="reason_genre">
+        <item quantity="one">%1$s, like %2$d of your books</item>
+        <item quantity="other">%1$s, like %2$d of your books</item>
+    </plurals>
+    <string name="reason_publisher">From %1$s, a publisher you read</string>
+    <string name="add_to_want">Add to Want to read</string>
+    <string name="added_to_want">Added to Want to read</string>
 </resources>

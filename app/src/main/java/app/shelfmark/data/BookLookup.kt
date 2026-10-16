@@ -110,7 +110,7 @@ class BookLookup {
         return BookInfo(
             isbn = isbn,
             title = title,
-            authors = data.optJSONArray("creators").names().joinToString(", ") { invertName(it) },
+            authors = data.optJSONArray("creators").names().joinToString(", ") { personName(it) },
             publisher = origin?.str("publisher"),
             publishedDate = origin?.str("issued"),
             pageCount = data.optInt("pageCount").takeIf { it > 0 },
@@ -129,7 +129,7 @@ class BookLookup {
         return BookInfo(
             isbn = isbn,
             title = title,
-            authors = data.stringList("creator").joinToString(", ") { invertName(it) },
+            authors = data.stringList("creator").joinToString(", ") { personName(it) },
             // Entries look like "Stockholm : Rabén & Sjögren"; keep the publisher's name.
             publisher = data.stringList("publisher")
                 .map { it.substringAfter(" : ").trim(' ', ';', ':') }
@@ -171,13 +171,6 @@ private fun JSONObject.stringList(key: String): List<String> =
 
 private fun JSONArray?.names(): List<String> =
     if (this == null) emptyList() else (0 until length()).mapNotNull { optString(it).trim().ifBlank { null } }
-
-/** Library catalogues write "Nesbø, Jo" or "Lindgren, Astrid, 1907-2002"; shows "Jo Nesbø". */
-private fun invertName(name: String): String {
-    val parts = name.split(",").map { it.trim() }
-    if (parts.size < 2 || parts[1].isEmpty() || parts[1].first().isDigit()) return parts[0]
-    return "${parts[1]} ${parts[0]}"
-}
 
 /** Joins a JSON array of strings, or of objects (using [key]), into "A, B". */
 private fun JSONArray?.joinValues(key: String? = null): String {

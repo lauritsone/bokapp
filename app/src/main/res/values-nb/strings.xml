@@ -135,4 +135,27 @@
     </plurals>
     <string name="import_nothing">Fant ingen bøker i filen.</string>
     <string name="import_failed">Kunne ikke lese filen. Velg en sikkerhetskopi fra Shelfmark (JSON) eller en CSV-fil med en tittelkolonne.</string>
+
+    <!-- New releases -->
+    <string name="releases_title">Nye bøker for deg</string>
+    <string name="releases_entry_subtitle">Nye bøker fra forfatterne og forlagene dine, med treffprosent</string>
+    <string name="releases_learning">Lærer smaken din … %1$d av %2$d bøker</string>
+    <string name="releases_searching">Leter etter nye bøker …</string>
+    <string name="releases_reading">Leser om nye bøker … %1$d av %2$d</string>
+    <string name="releases_offline">Fikk ikke kontakt med bibliotekkatalogen. Sjekk nettet og prøv igjen.</string>
+    <string name="releases_empty">Fant ingen nye bøker akkurat nå. Prøv igjen senere.</string>
+    <string name="releases_few_books">Gi karakter til flere bøker for mer treffsikre forslag.</string>
+    <string name="releases_source">Nye norske bøker fra Nasjonalbibliotekets katalog (nb.no), sammenlignet med biblioteket ditt.</string>
+    <string name="refresh">Oppdater</string>
+    <string name="try_again">Prøv igjen</string>
+    <string name="match_percent">%1$d %% treff</string>
+    <string name="reason_author">Av %1$s, som du ga %2$d★</string>
+    <string name="reason_author_unrated">Av %1$s, en forfatter i hyllene dine</string>
+    <plurals name="reason_genre">
+        <item quantity="one">%1$s, som %2$d av bøkene dine</item>
+        <item quantity="other">%1$s, som %2$d av bøkene dine</item>
+    </plurals>
+    <string name="reason_publisher">Fra %1$s, et forlag du leser</string>
+    <string name="add_to_want">Legg i Vil lese</string>
+    <string name="added_to_want">Lagt i Vil lese</string>
 </resources>

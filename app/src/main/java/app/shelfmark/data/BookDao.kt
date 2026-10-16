@@ -39,6 +39,9 @@ interface BookDao {
     @Query("UPDATE books SET shelf = :shelf, updatedAt = :now WHERE id = :id")
     suspend fun setShelf(id: Long, shelf: Shelf, now: Long)
 
+    @Query("UPDATE books SET genres = :genres, profiledAt = :now WHERE id = :id")
+    suspend fun setGenres(id: Long, genres: String?, now: Long)
+
     @Delete
     suspend fun delete(book: Book)
 }

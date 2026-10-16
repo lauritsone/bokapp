@@ -24,6 +24,10 @@ data class Book(
     val rating: Int = 0,
     val notes: String = "",
     @ColumnInfo(defaultValue = "0") val shelf: Shelf = Shelf.Read,
+    /** Genre tags from the library catalogues (see [Genres]); used for match scores. */
+    val genres: String? = null,
+    /** When [genres] was last looked up; 0 = not yet. */
+    @ColumnInfo(defaultValue = "0") val profiledAt: Long = 0,
     val addedAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

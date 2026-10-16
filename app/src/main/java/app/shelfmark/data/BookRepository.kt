@@ -14,6 +14,36 @@ class BookRepository(
 ) {
     val books: Flow<List<Book>> = dao.observeAll()
 
+    private val releaseFinder = ReleaseFinder(dao, NbCatalog())
+
+    /** The last search, kept while the app runs so revisiting the page is instant. */
+    var lastReleases: ReleaseResult? = null
+        private set
+
+    /** New books scored against the user's taste. @throws java.io.IOException when offline. */
+    suspend fun findReleases(onProgress: (ReleaseProgress) -> Unit): ReleaseResult =
+        withContext(Dispatchers.IO) { releaseFinder.find(onProgress) }.also { lastReleases = it }
+
+    /** Puts a suggested new book on the Want to read shelf; returns its id. */
+    suspend fun addToWantToRead(match: Match): Long {
+        val c = match.candidate
+        return save(
+            Book(
+                title = c.record.title,
+                authors = c.author,
+                isbn = c.record.isbn,
+                publisher = c.record.publisher,
+                publishedDate = c.record.year?.toString(),
+                pageCount = c.record.pageCount,
+                description = c.summary,
+                coverUrl = c.record.coverUrl,
+                shelf = Shelf.WantToRead,
+                genres = Genres.encode(c.tags).ifEmpty { null },
+                profiledAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
     fun observe(id: Long): Flow<Book?> = dao.observe(id)
 
     suspend fun get(id: Long): Book? = dao.get(id)

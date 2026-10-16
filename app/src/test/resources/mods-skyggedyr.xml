@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><mods xmlns="http://www.loc.gov/mods/v3" xmlns:local="http://www.loc.org/namespace" xmlns:nbmodsext="http://www.nb.no/NBModsExtension/v1" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="3.8" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-8.xsd">
+   <titleInfo>
+      <title>Skyggedyr</title>
+      <subTitle>krim</subTitle>
+   </titleInfo>
+   <titleInfo nameTitleGroup="1" type="uniform">
+      <title>Skyggdjur Norsk</title>
+   </titleInfo>
+   <name nameTitleGroup="1" type="personal" usage="primary">
+      <namePart>Rolfsdotter, Ulrika</namePart>
+      <namePart type="date">1977-</namePart>
+      <role>
+         <roleTerm authority="marcrelator" type="code">aut</roleTerm>
+      </role>
+      <nameIdentifier>bibsys.no:authority:1642068489850</nameIdentifier>
+   </name>
+   <name type="personal">
+      <namePart>Wessel, Nina</namePart>
+      <role>
+         <roleTerm authority="marcrelator" type="code">trl</roleTerm>
+      </role>
+      <nameIdentifier>bibsys.no:authority:1695616272109</nameIdentifier>
+   </name>
+   <name type="corporate">
+      <namePart>Nuanxed</namePart>
+      <role>
+         <roleTerm authority="marcrelator" type="code">trl</roleTerm>
+      </role>
+      <nameIdentifier>2573515</nameIdentifier>
+   </name>
+   <name type="corporate">
+      <namePart>Kunstig intelligens</namePart>
+      <role>
+         <roleTerm authority="marcrelator" type="code">trl</roleTerm>
+      </role>
+   </name>
+   <typeOfResource>text</typeOfResource>
+   <genre authority="marcgt">fiction</genre>
+   <genre type="literaryform">fiction</genre>
+   <genre authority="rdaco" valueURI="http://rdaregistry.info/termList/RDAContentType/1020">tekst</genre>
+   <subject authority="ntsf">
+      <genre>Krim</genre>
+   </subject>
+   <subject authority="ntsf">
+      <genre>Romaner</genre>
+   </subject>
+   <originInfo>
+      <place>
+         <placeTerm authority="marccountry" type="code">no</placeTerm>
+      </place>
+      <dateIssued encoding="marc">2026</dateIssued>
+      <issuance>monographic</issuance>
+      <edition>1. utgave</edition>
+   </originInfo>
+   <originInfo eventType="publication">
+      <place>
+         <placeTerm type="text">Oslo</placeTerm>
+      </place>
+      <agent>
+         <namePart>Aschehoug</namePart>
+         <role>
+            <roleTerm>publisher</roleTerm>
+         </role>
+      </agent>
+      <dateIssued>2026</dateIssued>
+   </originInfo>
+   <language>
+      <languageTerm authority="iso639-2b" type="code">nob</languageTerm>
+   </language>
+   <language objectPart="translation">
+      <languageTerm authority="iso639-2b" type="code">swe</languageTerm>
+   </language>
+   <physicalDescription>
+      <form authority="marcform">print</form>
+      <form authority="marccategory">text</form>
+      <form authority="marcsmd">regular print</form>
+      <form authority="rdamt" type="media">uformidlet</form>
+      <form authority="rdact" type="carrier">bind</form>
+      <internetMediaType>image/jpeg</internetMediaType>
+      <extent>397 sider</extent>
+   </physicalDescription>
+   <abstract type="Summary">Det er midtsommer og hetebølge i Ådalen. I Lockne samles bygdefolket til fest, invitert av eieren av strippeklubben Paradiset, som nylig har åpnet i bygda. Han kalles Greven, men folk sier at han er djevelen selv. I løpet av natten brenner Paradiset ned, og Greven blir funnet død. Ikke langt derfra finner man en jente i bare undertøyet, sjokkert og stum, med en død kanin i armene. Sosionomen Annie Ljung og Sara Emilsson ved Kramfors-politiet blir trukket inn i drapsetterforskningen og mysteriet rundt den stumme jenta. Er hun et vitne eller et offer, og finnes det en sammenheng mellom jenta og det Annie Ljung selv ble utsatt for som tenåring? Skyggedyr er den tredje kriminalromanen i serien om Annie Ljung.</abstract>
+   <targetAudience authority="marctarget">adult</targetAudience>
+   <note type="statement of responsibility">Ulrika Rolfsdotter</note>
+   <note>Utgivelsesår ikke oppgitt i publikasjonen</note>
+   <subject xmlns:xlink="http://www.w3.org/1999/xlink" authority="neo" xlink:href="https://id.nb.no/vocabulary/neo/12705">
+      <topic>Annie Ljung (fiktiv person)</topic>
+   </subject>
+   <subject xmlns:xlink="http://www.w3.org/1999/xlink" authority="neo" xlink:href="https://id.nb.no/vocabulary/neo/11041">
+      <topic>Ådalen</topic>
+   </subject>
+   <classification authority="ddc" edition="23/nor/20260903">839.738</classification>
+   <location>
+      <url displayLabel="Fulltekst Nettbiblioteket" note="Digital representasjon" usage="primary display">https://urn.nb.no/URN:NBN:no-nb_pliktmonografi_000087835</url>
+   </location>
+   <location>
+      <url displayLabel="electronic resource" usage="primary display">http://urn.nb.no/URN:NBN:no-nb_pliktmonografi_000087835</url>
+   </location>
+   <relatedItem xmlns:xlink="http://www.w3.org/1999/xlink" type="series" xlink:href="(NO-TrBIB)1642068489850">
+      <titleInfo>
+         <title>Annie Ljung</title>
+         <partNumber>3</partNumber>
+      </titleInfo>
+      <name type="personal">
+         <namePart>Rolfsdotter, Ulrika</namePart>
+         <namePart type="date">1977-</namePart>
+      </name>
+   </relatedItem>
+   <relatedItem>
+      <physicalDescription>
+         <internetMediaType>image/jpeg</internetMediaType>
+      </physicalDescription>
+      <location>
+         <url displayLabel="Originalt bilde">https://contents.bibs.aws.unit.no/files/images/original/1/6/9788203465161.jpg</url>
+      </location>
+   </relatedItem>
+   <relatedItem>
+      <location>
+         <url displayLabel="Forlagets beskrivelse (lang)">https://contents.bibs.aws.unit.no/content/?isbn=9788203465161</url>
+      </location>
+   </relatedItem>
+   <identifier type="isbn">9788203465161</identifier>
+   <identifier type="exlnz-47bibsys_network">999925838255602201</identifier>
+   <identifier type="uri">http://urn.nb.no/URN:NBN:no-nb_pliktmonografi_000087835</identifier>
+   <identifier type="urn">URN:NBN:no-nb_pliktmonografi_000087835</identifier>
+   <recordInfo>
+      <descriptionStandard>rda</descriptionStandard>
+      <recordContentSource authority="marcorg">NO-OsBAS</recordContentSource>
+      <recordCreationDate encoding="marc">260626</recordCreationDate>
+      <recordChangeDate encoding="iso8601">20261014T132535.0</recordChangeDate>
+      <recordIdentifier source="nb.bibsys.no">999920742266002202</recordIdentifier>
+      <recordOrigin>Converted from MARCXML to MODS version 3.8 using
+                    MARC21slim_MODS3-8_XSL2-0.xsl (Revision 2.78 2024/10/03)</recordOrigin>
+      <languageOfCataloging>
+         <languageTerm authority="iso639-2b" type="code">nob</languageTerm>
+      </languageOfCataloging>
+   </recordInfo>
+   <relatedItem displayLabel="Del av Bibliografien" type="host">
+      <titleInfo>
+         <title>KI-generert innhold</title>
+      </titleInfo>
+      <genre authority="marcgt">bibliography</genre>
+   </relatedItem>
+   <relatedItem displayLabel="Del av Bibliografien" type="host">
+      <titleInfo>
+         <title>Norbok</title>
+      </titleInfo>
+      <genre authority="marcgt">bibliography</genre>
+   </relatedItem>
+   <extension>
+      <nbmodsext:bookGroup>504</nbmodsext:bookGroup>
+   </extension>
+<identifier type="sesamid">be4bef18fa1911299817d4ad61fb7666</identifier><identifier type="oaiid">oai:nb.bibsys.no:999920742266002202</identifier></mods>
