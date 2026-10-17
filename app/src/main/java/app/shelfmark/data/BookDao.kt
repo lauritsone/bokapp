@@ -67,20 +67,41 @@ interface BookDao {
     @Query("UPDATE books SET genres = :genres, profiledAt = :now WHERE id = :id")
     suspend fun setGenres(id: Long, genres: String?, now: Long)
 
-    /** Several books' genres in one transaction, so the library redraws once. */
+    /** Learned genres, unless the book was edited or re-profiled since [read] was read. */
+    @Query(
+        "UPDATE books SET genres = :genres, profiledAt = :now WHERE id = :id " +
+            "AND updatedAt = :readUpdatedAt AND profiledAt = :readProfiledAt",
+    )
+    suspend fun setGenresIfUnchanged(id: Long, genres: String?, now: Long, readUpdatedAt: Long, readProfiledAt: Long)
+
+    /**
+     * Genres learned in the background for several books, in one transaction so the library
+     * redraws once. A book changed while its genres were looked up keeps the newer state.
+     */
     @Transaction
-    suspend fun setGenres(genres: Map<Long, String?>, now: Long) {
-        for ((id, g) in genres) setGenres(id, g, now)
+    suspend fun setGenres(learned: List<Pair<Book, String?>>, now: Long) {
+        for ((read, g) in learned) setGenresIfUnchanged(read.id, g, now, read.updatedAt, read.profiledAt)
     }
 
     /** Sets the cover and marks it as checked. */
     @Query("UPDATE books SET coverUrl = :coverUrl, coverCheckedAt = :now WHERE id = :id")
     suspend fun setCover(id: Long, coverUrl: String?, now: Long)
 
-    /** Several books' covers in one transaction, so the library redraws once. */
+    /** A cover found in the background, unless the book's cover or details changed since it was read. */
+    @Query(
+        "UPDATE books SET coverUrl = :coverUrl, coverCheckedAt = :now WHERE id = :id AND photoPath IS NULL " +
+            "AND coverCheckedAt = 0 AND coverUrl IS :readCoverUrl AND updatedAt = :readUpdatedAt",
+    )
+    suspend fun setCoverIfUnchanged(id: Long, coverUrl: String?, now: Long, readCoverUrl: String?, readUpdatedAt: Long)
+
+    /**
+     * Covers found in the background for several books, in one transaction so the library
+     * redraws once. A book edited (or given a cover) while its cover was looked for keeps
+     * the newer state, and is looked at again on the next run.
+     */
     @Transaction
-    suspend fun setCovers(covers: Map<Long, String?>, now: Long) {
-        for ((id, url) in covers) setCover(id, url, now)
+    suspend fun setCovers(found: List<Pair<Book, String?>>, now: Long) {
+        for ((read, url) in found) setCoverIfUnchanged(read.id, url, now, read.coverUrl, read.updatedAt)
     }
 
     @Query("UPDATE books SET currentPage = :page, updatedAt = :now WHERE id = :id")

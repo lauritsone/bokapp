@@ -72,7 +72,7 @@ class BookRepository(
         // Found covers are saved a batch at a time: each write redraws the library, and an
         // import can leave hundreds of books to check.
         for (batch in pending.chunked(COVER_BATCH)) {
-            val found = java.util.concurrent.ConcurrentHashMap<Long, java.util.Optional<String>>()
+            val found = java.util.concurrent.ConcurrentLinkedQueue<Pair<Book, String?>>()
             coroutineScope {
                 batch.map { book ->
                     launch {
@@ -80,7 +80,7 @@ class BookRepository(
                             val guess = book.coverUrl
                             try {
                                 val cover = if (guess != null && imageExists(guess)) guess else coverFinder.find(book)
-                                found[book.id] = java.util.Optional.ofNullable(cover)
+                                found += book to cover
                             } catch (e: IOException) {
                                 // Offline: leave it for the next run.
                             } catch (e: JSONException) {
@@ -90,7 +90,7 @@ class BookRepository(
                     }
                 }.joinAll()
             }
-            if (found.isNotEmpty()) dao.setCovers(found.mapValues { it.value.orElse(null) }, System.currentTimeMillis())
+            if (found.isNotEmpty()) dao.setCovers(found.toList(), System.currentTimeMillis())
         }
     }
 
@@ -470,58 +470,58 @@ class BookRepository(
                 null to LibraryImport.decode(stream.readBytes())
             }
         }
-        val incoming = try {
-            LibraryImport.parse(text)
-                // A photo path only means something inside a backup zip.
-                .map { book -> book.copy(photoPath = book.photoPath?.let { backup?.photos?.get(it) }?.absolutePath) }
-        } catch (e: Exception) {
-            backup?.photos?.values?.forEach { it.delete() }
-            throw e
-        }
-        // Photos in the zip that no book names.
-        val named = incoming.mapNotNull { it.photoPath }.toSet()
-        backup?.photos?.values?.filter { it.absolutePath !in named }?.forEach { it.delete() }
-        val existing = dao.getAll()
-        val byIsbn = existing.filter { it.isbn != null }.associateBy { it.isbn }.toMutableMap()
-        val byName = existing.associateBy(::nameKey).toMutableMap()
-        val now = System.currentTimeMillis()
+        // Every photo this import unpacked. Whatever no saved book ends up using is deleted
+        // at the end, however the import ends; the library's own photos are never touched.
+        val unpacked = backup?.photos?.values.orEmpty().toMutableList()
+        var saved: List<Book> = emptyList()
+        var existing: List<Book> = emptyList()
+        var total = 0
         val fresh = mutableListOf<Book>()
         val updates = mutableListOf<Book>()
-        for (book in incoming) {
-            val match = book.isbn?.let { byIsbn[it] } ?: byName[nameKey(book)]
-            if (match == null) {
-                fresh += book.copy(
-                    updatedAt = book.updatedAt.takeIf { it > 0 } ?: now,
-                    // Genres from a backup needn't be looked up again.
-                    profiledAt = if (book.genres != null) Genres.profiledNow() else 0,
-                )
-                book.isbn?.let { byIsbn[it] = book }
-                byName[nameKey(book)] = book
-                continue
-            }
-            // Listed twice in the file: the first copy is kept.
-            if (match.id == 0L) {
-                book.photoPath?.let { File(it).delete() }
-                continue
-            }
-            // Already in the library: the newer copy wins.
-            val merged = LibraryImport.merge(match, book)
-            if (merged == null) {
-                book.photoPath?.let { File(it).delete() }
-                continue
-            }
-            if (book.photoPath != null && merged.photoPath != book.photoPath) File(book.photoPath).delete()
-            updates += merged
-            byName[nameKey(merged)] = merged.copy(id = 0)
-            merged.isbn?.let { byIsbn[it] = merged.copy(id = 0) }
-        }
-        // One transaction: an import is all or nothing, and the library redraws once.
         try {
+            val assigned = mutableSetOf<File>()
+            val incoming = LibraryImport.parse(text).map { book ->
+                // A photo path only means something inside a backup zip.
+                val file = book.photoPath?.let { backup?.photos?.get(it) }
+                // Two books naming the same photo each get their own copy, so deleting one never removes the other's.
+                val own = when {
+                    file == null -> null
+                    assigned.add(file) -> file
+                    else -> newPhotoFile().also { copy -> file.copyTo(copy); unpacked += copy }
+                }
+                book.copy(photoPath = own?.absolutePath)
+            }
+            total = incoming.size
+            existing = dao.getAll()
+            val byIsbn = existing.filter { it.isbn != null }.associateBy { it.isbn }.toMutableMap()
+            val byName = existing.associateBy(::nameKey).toMutableMap()
+            val now = System.currentTimeMillis()
+            for (book in incoming) {
+                val match = book.isbn?.let { byIsbn[it] } ?: byName[nameKey(book)]
+                if (match == null) {
+                    fresh += book.copy(
+                        updatedAt = book.updatedAt.takeIf { it > 0 } ?: now,
+                        // Genres from a backup needn't be looked up again.
+                        profiledAt = if (book.genres != null) Genres.profiledNow() else 0,
+                    )
+                    book.isbn?.let { byIsbn[it] = book }
+                    byName[nameKey(book)] = book
+                    continue
+                }
+                // Listed twice in the file: the first copy is kept.
+                if (match.id == 0L) continue
+                // Already in the library: the newer copy wins.
+                val merged = LibraryImport.merge(match, book) ?: continue
+                updates += merged
+                byName[nameKey(merged)] = merged.copy(id = 0)
+                merged.isbn?.let { byIsbn[it] = merged.copy(id = 0) }
+            }
+            // One transaction: an import is all or nothing, and the library redraws once.
             dao.upsertAll(updates + fresh)
-        } catch (e: Exception) {
-            // Only the photos this import unpacked; the library's own stay.
-            backup?.photos?.values?.forEach { it.delete() }
-            throw e
+            saved = updates + fresh
+        } finally {
+            val used = saved.mapNotNull { it.photoPath }.toSet()
+            unpacked.filter { it.absolutePath !in used }.forEach { it.delete() }
         }
         // Replaced photos go only once the new ones are safely in.
         val oldPhotos = existing.associate { it.id to it.photoPath }
@@ -533,7 +533,7 @@ class BookRepository(
             repairCovers()
             lastReleases = null
         }
-        ImportResult(added = fresh.size, updated = updates.size, skipped = incoming.size - fresh.size - updates.size)
+        ImportResult(added = fresh.size, updated = updates.size, skipped = total - fresh.size - updates.size)
     }
 
     private fun nameKey(book: Book) = foldText(book.title) + "|" + foldText(book.authors)

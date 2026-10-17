@@ -154,11 +154,11 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         onProgress(ReleaseProgress.LearningTaste(0, pending.size))
         // Saved a batch at a time, since each write redraws the library.
         for (batch in pending.chunked(GENRE_BATCH)) {
-            val learned = ConcurrentHashMap<Long, java.util.Optional<String>>()
+            val learned = java.util.concurrent.ConcurrentLinkedQueue<Pair<Book, String?>>()
             concurrently(batch) { book ->
                 try {
                     val tags = genresFor(book)
-                    learned[book.id] = java.util.Optional.ofNullable(tags.takeIf { it.isNotEmpty() }?.let(Genres::encode))
+                    learned += book to tags.takeIf { it.isNotEmpty() }?.let(Genres::encode)
                 } catch (e: IOException) {
                     // Offline or catalogue hiccup: try this book again next time.
                 } catch (e: JSONException) {
@@ -166,7 +166,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
                 }
                 onProgress(ReleaseProgress.LearningTaste(done.incrementAndGet(), pending.size))
             }
-            if (learned.isNotEmpty()) dao.setGenres(learned.mapValues { it.value.orElse(null) }, Genres.profiledNow())
+            if (learned.isNotEmpty()) dao.setGenres(learned.toList(), Genres.profiledNow())
         }
     }
 

@@ -72,8 +72,9 @@ class DiskCache internal constructor(private val dir: File, private val maxAgeMs
         val text = httpGet(url, timeoutMs)
         try {
             dir.mkdirs()
-            // Written beside it and renamed, so a half-written file is never read back.
-            val partial = File(dir, file.name + ".part").apply { writeText(text) }
+            // Written to a file of its own and renamed, so a half-written answer is never read
+            // back, even when two searches fetch the same address at once.
+            val partial = File.createTempFile(file.name, ".part", dir).apply { writeText(text) }
             if (!partial.renameTo(file)) partial.delete()
         } catch (e: IOException) {
             // A full disk just means no cache.
