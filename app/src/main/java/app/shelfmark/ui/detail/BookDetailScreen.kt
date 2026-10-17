@@ -78,12 +78,30 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.data.Book
 import app.shelfmark.data.coverModel
+import app.shelfmark.ui.components.BarSpinner
 import app.shelfmark.ui.components.BookCover
+import app.shelfmark.ui.components.ButtonSpinner
+import app.shelfmark.ui.components.CoverSize
+import app.shelfmark.ui.components.EmptyState
+import app.shelfmark.ui.components.InfoCard
+import app.shelfmark.ui.components.LoadingState
+import app.shelfmark.ui.components.RatingPicker
+import app.shelfmark.ui.components.SectionTitle
+import app.shelfmark.ui.components.ShelfmarkTopBar
+import app.shelfmark.ui.theme.Dimens
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import app.shelfmark.ui.components.FinishButton
 import app.shelfmark.ui.components.FinishSheet
-import app.shelfmark.ui.components.RatingBar
 import app.shelfmark.ui.components.formatDate
-import app.shelfmark.ui.components.ratingLabel
 import app.shelfmark.ui.components.rememberRepository
 import app.shelfmark.ui.theme.ReadingStyle
 
@@ -100,6 +118,7 @@ fun BookDetailScreen(
     val book by vm.book.collectAsStateWithLifecycle()
     val askForReview by vm.askForReview.collectAsStateWithLifecycle()
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val refreshResult by vm.refreshResult.collectAsStateWithLifecycle()
     val offline by vm.offline.collectAsStateWithLifecycle()
@@ -108,6 +127,11 @@ fun BookDetailScreen(
     val seriesBooks by vm.seriesBooks.collectAsStateWithLifecycle()
     val next by vm.next.collectAsStateWithLifecycle()
     val resources = LocalResources.current
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scroll = rememberScrollState()
+    // The title moves into the bar once the cover and title have scrolled away.
+    val coverHeight = with(LocalDensity.current) { 300.dp.toPx() }
+    val coverGone by remember(coverHeight) { derivedStateOf { scroll.value > coverHeight } }
 
     LaunchedEffect(refreshResult, offline) {
         val result = refreshResult
@@ -124,7 +148,7 @@ fun BookDetailScreen(
         val canPick = result == RefreshResult.NotFound || result == RefreshResult.Ambiguous
         val choice = snackbar.showSnackbar(
             message,
-            actionLabel = if (canPick) res.getString(R.string.edit) else null,
+            actionLabel = if (canPick) res.getString(R.string.edit_details) else null,
             withDismissAction = canPick,
             duration = if (canPick) SnackbarDuration.Long else SnackbarDuration.Short,
         )
@@ -134,20 +158,18 @@ fun BookDetailScreen(
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
-                title = {},
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
+            ShelfmarkTopBar(
+                title = book?.title?.takeIf { coverGone },
+                onBack = onBack,
+                scrollBehavior = scrollBehavior,
                 actions = {
                     IconButton(onClick = vm::refresh, enabled = book != null && !refreshing) {
                         if (refreshing) {
-                            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                            BarSpinner()
                         } else {
                             Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.refresh_details))
                         }
@@ -155,23 +177,40 @@ fun BookDetailScreen(
                     IconButton(onClick = onEdit, enabled = book != null) {
                         Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.edit_details))
                     }
-                    IconButton(onClick = { confirmDelete = true }, enabled = book != null) {
-                        Icon(Icons.Rounded.DeleteOutline, contentDescription = stringResource(R.string.remove_from_library))
+                    // Removing is rare and can't be taken back by a tap, so it sits behind the ⋮ menu.
+                    Box {
+                        IconButton(onClick = { menuOpen = true }, enabled = book != null) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options))
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.remove_from_library)) },
+                                leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    confirmDelete = true
+                                },
+                            )
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
         val current = book
         if (current == null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                // Briefly while loading; for good if the book was removed meanwhile.
-                if (missing) {
-                    Text(stringResource(R.string.book_not_found), style = MaterialTheme.typography.bodyLarge)
-                } else {
-                    CircularProgressIndicator()
+            // Briefly while loading; for good if the book was removed meanwhile.
+            if (missing) {
+                EmptyState(
+                    title = null,
+                    body = stringResource(R.string.book_not_found),
+                    icon = Icons.Rounded.Info,
+                    modifier = Modifier.padding(padding).padding(horizontal = Dimens.gutter),
+                ) {
+                    TextButton(onClick = onBack) { Text(stringResource(R.string.go_back)) }
                 }
+            } else {
+                LoadingState(Modifier.padding(padding))
             }
         } else {
             DetailContent(
@@ -198,7 +237,8 @@ fun BookDetailScreen(
                         onReadAgain = vm::readAgain,
                     )
                 },
-                modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                scroll = scroll,
+                contentPadding = padding,
             )
         }
     }
@@ -255,24 +295,26 @@ private fun DetailContent(
     onFindDetails: () -> Unit,
     refreshing: Boolean,
     extras: DetailExtras,
-    modifier: Modifier = Modifier,
+    scroll: ScrollState,
+    contentPadding: PaddingValues,
 ) {
     var editingDate by rememberSaveable { mutableStateOf<String?>(null) }
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
+            .consumeWindowInsets(contentPadding)
             .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
-            .padding(top = 4.dp, bottom = 48.dp),
+            .verticalScroll(scroll)
+            // Inside the scroll, so the page scrolls under the top bar and the navigation bar.
+            .padding(contentPadding)
+            .padding(horizontal = Dimens.gutter)
+            .padding(top = Dimens.topGap, bottom = Dimens.bottomGap),
     ) {
         BookCover(
             model = book.coverModel(),
             title = book.title,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .width(164.dp),
-            elevation = 14.dp,
+            size = CoverSize.Hero,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
         )
         Spacer(Modifier.height(28.dp))
         Text(
@@ -290,11 +332,6 @@ private fun DetailContent(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-        } else {
-            // Typed in by hand after a failed scan: look the rest up in the catalogues.
-            TextButton(onClick = onFindDetails, enabled = !refreshing, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text(stringResource(R.string.add_missing_details), textAlign = TextAlign.Center)
-            }
         }
 
         if (book.series != null) {
@@ -314,24 +351,9 @@ private fun DetailContent(
         Spacer(Modifier.height(20.dp))
         ShelfSelector(book.shelf, onShelf)
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Dimens.headerGap))
         if (book.shelf == Shelf.Read) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .padding(vertical = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                RatingBar(rating = book.rating, starSize = 44.dp, spacing = 4.dp, onRatingChange = onRate)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    ratingLabel(book.rating),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            InfoCard { RatingPicker(book.rating, onRatingChange = onRate) }
             Spacer(Modifier.height(4.dp))
             TextButton(onClick = extras.onReadAgain, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text(stringResource(R.string.read_again))
@@ -339,9 +361,9 @@ private fun DetailContent(
         } else {
             if (book.shelf == Shelf.Reading) {
                 ProgressCard(book, extras.onSetPage)
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(Dimens.headerGap))
                 FinishButton(onFinish, large = true)
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(Dimens.headerGap))
             }
             Text(
                 stringResource(R.string.rate_when_finished),
@@ -354,7 +376,7 @@ private fun DetailContent(
 
         // Notes written before the book went back to another shelf stay visible.
         if (book.shelf == Shelf.Read || book.notes.isNotBlank()) {
-            Spacer(Modifier.height(36.dp))
+            Spacer(Modifier.height(Dimens.sectionGap))
             NotesSection(book.notes, onSaveNotes)
         }
 
@@ -378,41 +400,30 @@ private fun DetailContent(
             if (book.shelf != Shelf.WantToRead) add(Triple("started", R.string.started_on, book.startedAt))
             if (book.shelf == Shelf.Read) add(Triple("finished", R.string.finished_on, book.finishedAt))
         }
-        Spacer(Modifier.height(36.dp))
-        Text(stringResource(R.string.details), style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(Dimens.sectionGap))
+        SectionTitle(stringResource(R.string.details))
+        // With large text a label beside its value would wrap badly; it goes above it instead.
+        val stacked = LocalDensity.current.fontScale > 1.3f
+        Column {
             facts.forEach { (label, value) ->
-                Row {
-                    Text(
-                        stringResource(label),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(104.dp),
-                    )
-                    Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                FactRow(stringResource(label), stacked) {
+                    Text(value, style = MaterialTheme.typography.bodyMedium)
                 }
             }
             dates.forEach { (key, label, value) ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(onClickLabel = stringResource(R.string.change_date)) { editingDate = key },
-                    verticalAlignment = Alignment.CenterVertically,
+                FactRow(
+                    stringResource(label),
+                    stacked,
+                    modifier = Modifier.clickable(onClickLabel = stringResource(R.string.change_date)) { editingDate = key },
+                    trailing = {
+                        Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    },
                 ) {
-                    Text(
-                        stringResource(label),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(104.dp),
-                    )
                     Text(
                         value?.let { formatDate(it, locale) } ?: stringResource(R.string.add_date),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (value == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
                     )
-                    Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -426,27 +437,29 @@ private fun DetailContent(
                 },
             )
         }
-        val missing = book.description.isNullOrBlank() || book.publisher == null || book.publishedDate == null ||
-            book.pageCount == null || book.isbn == null || (book.coverUrl == null && book.photoPath == null)
+        // Typed in by hand after a failed scan, say: the catalogues may have the rest.
+        val missing = book.authors.isBlank() || book.description.isNullOrBlank() || book.publisher == null ||
+            book.publishedDate == null || book.pageCount == null || book.isbn == null ||
+            (book.coverUrl == null && book.photoPath == null)
         if (missing) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Dimens.headerGap))
             OutlinedButton(
                 onClick = onFindDetails,
                 enabled = !refreshing,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(Dimens.buttonHeight),
             ) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                if (refreshing) ButtonSpinner() else Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.find_missing_details), style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.find_missing_details))
             }
         }
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(Dimens.sectionGap))
         LendingSection(book, extras.onLend, extras.onReturned)
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Dimens.headerGap))
         SuggestionsToggle(use = !book.ignoreForSuggestions, onChange = onUseForSuggestions)
     }
 }
@@ -457,14 +470,14 @@ private fun SuggestionsToggle(use: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .toggleable(value = use, role = Role.Switch, onValueChange = onChange)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(Dimens.cardPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.use_for_suggestions), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.use_for_suggestions), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.use_for_suggestions_hint),
@@ -482,13 +495,14 @@ private fun NotesSection(notes: String, onSave: (String) -> Unit) {
     var editing by rememberSaveable { mutableStateOf(false) }
     var draft by rememberSaveable(notes) { mutableStateOf(notes) }
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.your_notes), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-        if (!editing && notes.isNotBlank()) {
-            TextButton(onClick = { draft = notes; editing = true }) { Text(stringResource(R.string.edit)) }
-        }
-    }
-    Spacer(Modifier.height(10.dp))
+    SectionTitle(
+        stringResource(R.string.your_notes),
+        action = if (!editing && notes.isNotBlank()) {
+            { TextButton(onClick = { draft = notes; editing = true }) { Text(stringResource(R.string.edit)) } }
+        } else {
+            null
+        },
+    )
     when {
         editing -> {
             OutlinedTextField(
@@ -515,11 +529,11 @@ private fun NotesSection(notes: String, onSave: (String) -> Unit) {
             onClick = { editing = true },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
+                .height(Dimens.buttonHeight),
         ) {
             Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.write_thoughts), style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.write_thoughts))
         }
         else -> SelectionContainer {
             Text(notes, style = ReadingStyle, color = MaterialTheme.colorScheme.onSurface)
@@ -531,9 +545,8 @@ private fun NotesSection(notes: String, onSave: (String) -> Unit) {
 private fun DescriptionSection(description: String) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val long = description.length > 320
-    Spacer(Modifier.height(36.dp))
-    Text(stringResource(R.string.about_book), style = MaterialTheme.typography.titleLarge)
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(Dimens.sectionGap))
+    SectionTitle(stringResource(R.string.about_book))
     Text(
         description,
         style = MaterialTheme.typography.bodyLarge,
@@ -546,5 +559,38 @@ private fun DescriptionSection(description: String) {
         TextButton(onClick = { expanded = !expanded }, modifier = Modifier.padding(start = 0.dp)) {
             Text(stringResource(if (expanded) R.string.show_less else R.string.show_more))
         }
+    }
+}
+
+/** A label and its value in the Details section; [stacked] puts the label above, for large text. */
+@Composable
+private fun FactRow(
+    label: String,
+    stacked: Boolean,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+    value: @Composable () -> Unit,
+) {
+    val labelText = @Composable {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Row(
+        modifier
+            .fillMaxWidth()
+            // Tall enough to tap, for the dates that can be changed.
+            .heightIn(min = if (trailing != null) 48.dp else 32.dp)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (stacked) {
+            Column(Modifier.weight(1f)) {
+                labelText()
+                value()
+            }
+        } else {
+            Box(Modifier.width(112.dp)) { labelText() }
+            Box(Modifier.weight(1f)) { value() }
+        }
+        trailing?.invoke()
     }
 }

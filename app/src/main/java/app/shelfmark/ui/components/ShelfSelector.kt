@@ -26,13 +26,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.shelfmark.R
 import app.shelfmark.data.Shelf
+import app.shelfmark.ui.theme.LocalExtendedColors
 
 @get:StringRes
 val Shelf.label: Int
@@ -54,11 +54,11 @@ data class ShelfColors(val container: Color, val content: Color)
 /** Each shelf has its own colour so a book's shelf reads at a glance: green, indigo, plum. */
 @Composable
 fun Shelf.colors(): ShelfColors {
-    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val extended = LocalExtendedColors.current
     return when (this) {
-        Shelf.Read -> if (dark) ShelfColors(Color(0xFF1F3A2A), Color(0xFFB5E3C4)) else ShelfColors(Color(0xFFDCEFE3), Color(0xFF1E5A36))
+        Shelf.Read -> ShelfColors(extended.readContainer, extended.onReadContainer)
         Shelf.Reading -> ShelfColors(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
-        Shelf.WantToRead -> if (dark) ShelfColors(Color(0xFF3E2440), Color(0xFFEBC4EC)) else ShelfColors(Color(0xFFF2E3F2), Color(0xFF5B2D5E))
+        Shelf.WantToRead -> ShelfColors(extended.wantContainer, extended.onWantContainer)
     }
 }
 

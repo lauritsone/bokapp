@@ -7,7 +7,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -15,6 +19,8 @@ import androidx.compose.material.icons.rounded.Star
 import app.shelfmark.ui.icons.StarOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -80,6 +86,20 @@ fun RatingBar(
                     .graphicsLayer { scaleX = scale; scaleY = scale },
             )
         }
+    }
+}
+
+/** Big stars to rate with, and what the rating means in words; the same on every screen. */
+@Composable
+fun RatingPicker(rating: Int, onRatingChange: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        RatingBar(rating = rating, starSize = 44.dp, spacing = 4.dp, onRatingChange = onRatingChange)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            ratingLabel(rating),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

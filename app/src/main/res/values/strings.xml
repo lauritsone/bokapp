@@ -74,7 +74,6 @@
 
     <!-- Add / edit -->
     <string name="new_book">New book</string>
-    <string name="your_rating">Your rating</string>
     <string name="finding_isbn">Looking up ISBN %1$s…</string>
     <string name="title">Title</string>
     <string name="author">Author</string>
@@ -202,6 +201,7 @@
     <string name="lang_all">All</string>
     <string name="lang_norwegian">Norwegian</string>
     <string name="lang_english">English</string>
+    <string name="show_all_languages">Show all languages</string>
     <string name="mark_finished">Mark as finished</string>
     <string name="finished_title">You finished it!</string>
     <string name="skip_for_now">Skip for now</string>
@@ -225,7 +225,6 @@
     <string name="msg_isbn_mismatch">ISBN %1$s belongs to “%2$s” by %3$s, not the title you typed. Check the number, or find the book by title instead.</string>
     <string name="msg_isbn_mismatch_no_author">ISBN %1$s belongs to “%2$s”, not the title you typed. Check the number, or find the book by title instead.</string>
     <string name="msg_no_title_matches">No book with that title in the catalogues. Check the spelling, or fill in the details yourself.</string>
-    <string name="add_missing_details">Look up the author and other details</string>
     <string name="refresh_details">Look up missing details</string>
     <string name="find_missing_details">Look up missing details</string>
     <plurals name="refresh_updated">

@@ -1,5 +1,6 @@
 package app.shelfmark.ui.components
 
+import android.util.LruCache
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -12,7 +13,6 @@ import app.shelfmark.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,32 +45,48 @@ private val bindingTones = listOf(
 /** Spine side is squarer than the fore-edge, like a real book. */
 val CoverShape = RoundedCornerShape(topStart = 2.dp, bottomStart = 2.dp, topEnd = 7.dp, bottomEnd = 7.dp)
 
+/** The cover sizes used across the app, each with its own shadow. */
+enum class CoverSize(val width: Dp, val elevation: Dp) {
+    /** In compact lists: series, search results. */
+    Thumb(40.dp, 2.dp),
+
+    /** In the library and suggestion lists. */
+    Standard(68.dp, 3.dp),
+
+    /** Beside a form or in a sheet. */
+    Medium(104.dp, 6.dp),
+
+    /** At the top of a book's page. */
+    Hero(164.dp, 14.dp),
+}
+
 /**
  * A book cover at 2:3. Shows a typeset cloth "binding" underneath, so a missing
- * or still-loading image always looks intentional. Set the width via [modifier].
+ * or still-loading image always looks intentional.
  */
 @Composable
 fun BookCover(
     model: Any?,
     title: String,
+    size: CoverSize,
     modifier: Modifier = Modifier,
-    elevation: Dp = 4.dp,
 ) {
     val tone = bindingTones[(title.hashCode() and Int.MAX_VALUE) % bindingTones.size]
-    BoxWithConstraints(
+    val width = size.width
+    Box(
         modifier
+            .width(width)
             .aspectRatio(2f / 3f)
-            .shadow(elevation, CoverShape)
+            .shadow(size.elevation, CoverShape)
             .clip(CoverShape)
             .background(tone),
     ) {
-        // Once the cover image is showing, the typeset title under it is skipped: measuring
-        // it for every cover scrolled into view is wasted work.
+        // Once the cover image is showing, the typeset title under it is no longer drawn.
         var loaded by remember(model) { mutableStateOf(false) }
         if (!loaded) {
             val text = title.ifBlank { stringResource(R.string.untitled) }
-            val textWidth = maxWidth * (1f - CoverStartPadding - CoverEndPadding)
-            val fontSize = rememberCoverFontSize(text, textWidth, baseSize = (maxWidth.value / 7.5f).coerceIn(8f, 24f))
+            val textWidth = width * (1f - CoverStartPadding - CoverEndPadding)
+            val fontSize = rememberCoverFontSize(text, textWidth, baseSize = (width.value / 7.5f).coerceIn(8f, 24f))
             Text(
                 text = text,
                 color = Color.White.copy(alpha = 0.92f),
@@ -78,9 +94,9 @@ fun BookCover(
                 maxLines = 5,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(
-                    start = maxWidth * CoverStartPadding,
-                    end = maxWidth * CoverEndPadding,
-                    top = maxWidth * 0.12f,
+                    start = width * CoverStartPadding,
+                    end = width * CoverEndPadding,
+                    top = width * 0.12f,
                 ),
             )
         }
@@ -98,7 +114,7 @@ fun BookCover(
         Box(
             Modifier
                 .fillMaxHeight()
-                .width(maxWidth * 0.07f)
+                .width(width * 0.07f)
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color.Black.copy(alpha = 0.28f), Color.White.copy(alpha = 0.06f), Color.Transparent),
@@ -131,11 +147,20 @@ private fun rememberCoverFontSize(text: String, width: Dp, baseSize: Float): Tex
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     return remember(text, width, baseSize, density) {
-        val available = with(density) { width.toPx() }
-        val widest = text.split(Regex("\\s+")).filter { it.isNotEmpty() }.maxOfOrNull { word ->
-            measurer.measure(word, coverTitleStyle(baseSize.sp), maxLines = 1, softWrap = false).size.width
-        } ?: 0
-        val scale = if (widest > available) (available / widest * 0.98f).coerceAtLeast(MinFontScale) else 1f
-        (baseSize * scale).sp
+        // The same covers scroll past again and again; each title is measured once.
+        val key = "$text|${width.value}|$baseSize|${density.density}|${density.fontScale}"
+        fontSizes[key]?.sp ?: run {
+            val available = with(density) { width.toPx() }
+            val widest = text.split(whitespace).filter { it.isNotEmpty() }.maxOfOrNull { word ->
+                measurer.measure(word, coverTitleStyle(baseSize.sp), maxLines = 1, softWrap = false).size.width
+            } ?: 0
+            val scale = if (widest > available) (available / widest * 0.98f).coerceAtLeast(MinFontScale) else 1f
+            (baseSize * scale).also { fontSizes.put(key, it) }.sp
+        }
     }
 }
+
+/** Font sizes already worked out, by title, width and screen density. */
+private val fontSizes = LruCache<String, Float>(512)
+
+private val whitespace = Regex("\\s+")

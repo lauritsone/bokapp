@@ -22,7 +22,8 @@ import org.json.JSONException
 /** Notices shown above the form; turned into text by the screen. */
 sealed interface EditMessage {
     data object InvalidIsbn : EditMessage
-    data object Offline : EditMessage
+    /** No catalogue answered; [isbn] is the lookup to try again, or null for the title search. */
+    data class Offline(val isbn: String? = null) : EditMessage
     data class NotFound(val isbn: String) : EditMessage
     /** The ISBN belongs to another book than the title typed; [found] is what it points at. */
     data class IsbnMismatch(val isbn: String, val found: BookInfo) : EditMessage
@@ -102,7 +103,7 @@ class BookEditViewModel(
             _state.update {
                 it.copy(
                     loading = false,
-                    message = EditMessage.Offline,
+                    message = EditMessage.Offline(isbn),
                 )
             }
             return
@@ -116,6 +117,13 @@ class BookEditViewModel(
                 else -> s.copy(loading = false, book = s.book.filledFrom(info))
             }
         }
+    }
+
+    /** Tries the lookup or search that found no connection again. */
+    fun retry() {
+        val offline = _state.value.message as? EditMessage.Offline ?: return
+        val isbn = offline.isbn
+        if (isbn != null) viewModelScope.launch { fetch(isbn) } else searchTitle()
     }
 
     /** Fills in the book an ISBN pointed at, though its title differs from the one typed. */
@@ -135,7 +143,7 @@ class BookEditViewModel(
                     // A typed author with a spelling the catalogue doesn't share: try the title alone.
                     .ifEmpty { if (book.authors.isNotBlank()) repo.searchCatalogue(book.title, "") else emptyList() }
             } catch (e: IOException) {
-                _state.update { it.copy(searching = false, message = EditMessage.Offline) }
+                _state.update { it.copy(searching = false, message = EditMessage.Offline()) }
                 return@launch
             }
             _state.update {

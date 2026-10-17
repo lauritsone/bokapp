@@ -69,7 +69,6 @@
 
     <!-- Add / edit -->
     <string name="new_book">Ny bok</string>
-    <string name="your_rating">Vurderingen din</string>
     <string name="finding_isbn">Slår opp ISBN %1$s …</string>
     <string name="title">Tittel</string>
     <string name="author">Forfatter</string>
@@ -197,6 +196,7 @@
     <string name="lang_all">Alle</string>
     <string name="lang_norwegian">Norsk</string>
     <string name="lang_english">Engelsk</string>
+    <string name="show_all_languages">Vis alle språk</string>
     <string name="mark_finished">Merk som lest</string>
     <string name="finished_title">Du har lest ut boken!</string>
     <string name="skip_for_now">Hopp over</string>
@@ -220,7 +220,6 @@
     <string name="msg_isbn_mismatch">ISBN %1$s hører til «%2$s» av %3$s, ikke tittelen du skrev. Sjekk nummeret, eller finn boken på tittel i stedet.</string>
     <string name="msg_isbn_mismatch_no_author">ISBN %1$s hører til «%2$s», ikke tittelen du skrev. Sjekk nummeret, eller finn boken på tittel i stedet.</string>
     <string name="msg_no_title_matches">Fant ingen bok med den tittelen i katalogene. Sjekk stavemåten, eller fyll inn detaljene selv.</string>
-    <string name="add_missing_details">Slå opp forfatter og andre detaljer</string>
     <string name="refresh_details">Slå opp manglende detaljer</string>
     <string name="find_missing_details">Slå opp manglende detaljer</string>
     <plurals name="refresh_updated">

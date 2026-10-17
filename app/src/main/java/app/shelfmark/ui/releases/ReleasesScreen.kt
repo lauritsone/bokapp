@@ -63,7 +63,22 @@ import app.shelfmark.data.Match
 import app.shelfmark.data.MatchReason
 import app.shelfmark.data.ReleaseProgress
 import app.shelfmark.data.Shelf
+import app.shelfmark.ui.components.BarSpinner
 import app.shelfmark.ui.components.BookCover
+import app.shelfmark.ui.components.CoverSize
+import app.shelfmark.ui.components.EmptyState
+import app.shelfmark.ui.components.LoadingState
+import app.shelfmark.ui.components.ShelfColors
+import app.shelfmark.ui.components.ShelfmarkTopBar
+import app.shelfmark.ui.icons.AutoAwesome
+import app.shelfmark.ui.theme.Dimens
+import app.shelfmark.ui.theme.LocalExtendedColors
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
 import app.shelfmark.ui.components.colors
 import app.shelfmark.ui.components.rememberRepository
 
@@ -74,39 +89,43 @@ fun ReleasesScreen(onBack: () -> Unit) {
     val vm: ReleasesViewModel = viewModel(factory = viewModelFactory { initializer { ReleasesViewModel(repo) } })
     val state by vm.state.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf<Match?>(null) }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.releases_title), style = MaterialTheme.typography.titleLarge) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
+            ShelfmarkTopBar(
+                title = stringResource(R.string.releases_title),
+                onBack = onBack,
+                scrollBehavior = scrollBehavior,
                 actions = {
-                    IconButton(onClick = vm::refresh, enabled = state !is ReleasesState.Loading) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.refresh))
+                    val loading = state is ReleasesState.Loading
+                    IconButton(onClick = vm::refresh, enabled = !loading) {
+                        if (loading) BarSpinner() else Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when (val s = state) {
-                is ReleasesState.Loading -> Loading(s.progress)
-                ReleasesState.Offline -> Offline(onRetry = vm::refresh)
-                is ReleasesState.Loaded -> ReleaseList(s, onOpen = { open = it })
+        when (val s = state) {
+            is ReleasesState.Loading -> LoadingState(Modifier.padding(padding), text = progressText(s.progress))
+            ReleasesState.Offline -> EmptyState(
+                title = null,
+                body = stringResource(R.string.releases_offline),
+                icon = Icons.Rounded.CloudOff,
+                modifier = Modifier.padding(padding).padding(horizontal = Dimens.gutter),
+            ) {
+                Button(onClick = vm::refresh) { Text(stringResource(R.string.try_again)) }
             }
+            is ReleasesState.Loaded -> ReleaseList(s, padding, onOpen = { open = it }, onRefresh = vm::refresh)
         }
     }
 
     val current = open
     val loaded = state as? ReleasesState.Loaded
     if (current != null && loaded != null) {
-        ModalBottomSheet(onDismissRequest = { open = null }) {
+        ModalBottomSheet(onDismissRequest = { open = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             ReleaseDetails(
                 match = current,
                 added = current.candidate.record.id in loaded.added,
@@ -117,45 +136,10 @@ fun ReleasesScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun Loading(progress: ReleaseProgress?) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        CircularProgressIndicator()
-        Spacer(Modifier.height(20.dp))
-        Text(
-            when (progress) {
-                is ReleaseProgress.LearningTaste -> pluralStringResource(R.plurals.releases_learning, progress.total, progress.done, progress.total)
-                is ReleaseProgress.ReadingDetails -> stringResource(R.string.releases_reading, progress.done, progress.total)
-                else -> stringResource(R.string.releases_searching)
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun Offline(onRetry: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(Icons.Rounded.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(40.dp))
-        Spacer(Modifier.height(16.dp))
-        Text(
-            stringResource(R.string.releases_offline),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(20.dp))
-        Button(onClick = onRetry) { Text(stringResource(R.string.try_again)) }
-    }
+private fun progressText(progress: ReleaseProgress?): String = when (progress) {
+    is ReleaseProgress.LearningTaste -> pluralStringResource(R.plurals.releases_learning, progress.total, progress.done, progress.total)
+    is ReleaseProgress.ReadingDetails -> stringResource(R.string.releases_reading, progress.done, progress.total)
+    else -> stringResource(R.string.releases_searching)
 }
 
 /** Which languages to show; English books come from Open Library, Norwegian from NB.no. */
@@ -166,10 +150,20 @@ private enum class LanguageFilter(@StringRes val label: Int, val language: Strin
 }
 
 @Composable
-private fun ReleaseList(state: ReleasesState.Loaded, onOpen: (Match) -> Unit) {
+private fun ReleaseList(state: ReleasesState.Loaded, padding: PaddingValues, onOpen: (Match) -> Unit, onRefresh: () -> Unit) {
     var filter by rememberSaveable { mutableStateOf(LanguageFilter.All) }
     val shown = state.result.matches.filter { filter.language == null || it.candidate.record.language == filter.language }
-    LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp)) {
+    val layoutDirection = LocalLayoutDirection.current
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        // Scrolls under the top bar and the navigation bar.
+        contentPadding = PaddingValues(
+            start = padding.calculateStartPadding(layoutDirection) + Dimens.gutter,
+            end = padding.calculateEndPadding(layoutDirection) + Dimens.gutter,
+            top = padding.calculateTopPadding() + Dimens.topGap,
+            bottom = padding.calculateBottomPadding() + Dimens.bottomGap,
+        ),
+    ) {
         item(key = "intro") {
             Column(Modifier.padding(bottom = 8.dp)) {
                 Text(
@@ -199,7 +193,7 @@ private fun ReleaseList(state: ReleasesState.Loaded, onOpen: (Match) -> Unit) {
                         FilterChip(
                             selected = f == filter,
                             onClick = { filter = f },
-                            label = { Text(stringResource(f.label), style = MaterialTheme.typography.labelLarge) },
+                            label = { Text(stringResource(f.label)) },
                         )
                     }
                 }
@@ -207,13 +201,14 @@ private fun ReleaseList(state: ReleasesState.Loaded, onOpen: (Match) -> Unit) {
         }
         if (shown.isEmpty()) {
             item(key = "empty") {
-                Text(
-                    stringResource(R.string.releases_empty),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
-                )
+                EmptyState(title = null, body = stringResource(R.string.releases_empty), icon = Icons.Rounded.AutoAwesome) {
+                    // Books may be waiting in the other language; otherwise, a new search.
+                    if (filter != LanguageFilter.All && state.result.matches.isNotEmpty()) {
+                        TextButton(onClick = { filter = LanguageFilter.All }) { Text(stringResource(R.string.show_all_languages)) }
+                    } else {
+                        TextButton(onClick = onRefresh) { Text(stringResource(R.string.try_again)) }
+                    }
+                }
             }
         }
         items(shown, key = { it.candidate.record.id }) { match ->
@@ -232,12 +227,12 @@ private fun ReleaseRow(match: Match, added: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        BookCover(c.record.coverUrl, c.record.title, Modifier.width(68.dp), elevation = 3.dp)
+        BookCover(c.record.coverUrl, c.record.title, CoverSize.Standard)
         Spacer(Modifier.width(20.dp))
         Column(Modifier.weight(1f)) {
             Text(c.record.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -277,12 +272,13 @@ private fun ReleaseRow(match: Match, added: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** The score as a pill: green for strong matches, indigo for good ones, grey otherwise. */
+/** The score as a pill: gold for strong matches, blue-grey for good ones, grey otherwise. */
 @Composable
 private fun MatchBadge(percent: Int) {
+    val extended = LocalExtendedColors.current
     val colors = when {
-        percent >= 75 -> Shelf.Read.colors()
-        percent >= 50 -> Shelf.Reading.colors()
+        percent >= 75 -> ShelfColors(extended.strongMatchContainer, extended.onStrongMatchContainer)
+        percent >= 50 -> ShelfColors(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
         else -> null
     }
     Text(
@@ -333,17 +329,17 @@ private fun ReleaseDetails(match: Match, added: Boolean, onAdd: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 24.dp)
+            .padding(horizontal = Dimens.gutter)
+            .padding(bottom = Dimens.bottomGap)
             .navigationBarsPadding(),
     ) {
         Row(verticalAlignment = Alignment.Top) {
-            BookCover(c.record.coverUrl, c.record.title, Modifier.width(96.dp), elevation = 6.dp)
-            Spacer(Modifier.width(18.dp))
+            BookCover(c.record.coverUrl, c.record.title, CoverSize.Medium)
+            Spacer(Modifier.width(20.dp))
             Column(Modifier.weight(1f)) {
                 Text(c.record.title, style = MaterialTheme.typography.titleLarge)
                 if (c.author.isNotBlank()) {
-                    Text(c.author, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(c.author, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 val facts = listOfNotNull(
                     c.record.publisher,
@@ -364,14 +360,14 @@ private fun ReleaseDetails(match: Match, added: Boolean, onAdd: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
         if (added) {
-            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeight)) {
                 Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.added_to_want))
             }
         } else {
-            Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                Text(stringResource(R.string.add_to_want), style = MaterialTheme.typography.labelLarge)
+            Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeight)) {
+                Text(stringResource(R.string.add_to_want))
             }
         }
         // The description comes last, so the button stays in reach without scrolling.

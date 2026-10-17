@@ -29,8 +29,7 @@ import app.shelfmark.data.Isbn
 fun IsbnDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
     val isbn = Isbn.normalize(text)
-    val digits = text.count { it.isDigit() || it == 'x' || it == 'X' }
-    val showError = digits >= 10 && isbn == null
+    val showError = isbnLooksWrong(text)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -44,7 +43,7 @@ fun IsbnDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = text,
-                    onValueChange = { v -> text = v.filter { it.isDigit() || it in "xX- " }.take(17) },
+                    onValueChange = { v -> text = isbnInput(v) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     label = { Text(stringResource(R.string.isbn)) },
@@ -66,3 +65,10 @@ fun IsbnDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
         },
     )
 }
+
+/** What an ISBN field takes: digits, the check digit X, dashes and spaces. */
+fun isbnInput(typed: String): String = typed.filter { it.isDigit() || it in "xX- " }.take(17)
+
+/** Whether [text] has all the digits of an ISBN but isn't a valid one. */
+fun isbnLooksWrong(text: String): Boolean =
+    text.count { it.isDigit() || it == 'x' || it == 'X' } >= 10 && Isbn.normalize(text) == null

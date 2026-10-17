@@ -47,7 +47,15 @@ import app.shelfmark.R
 import app.shelfmark.data.Book
 import app.shelfmark.data.Shelf
 import app.shelfmark.data.progress
-import app.shelfmark.ui.components.BookCover
+import app.shelfmark.ui.components.ButtonSpinner
+import app.shelfmark.ui.components.CompactBookRow
+import app.shelfmark.ui.components.InfoCard
+import app.shelfmark.ui.components.SectionTitle
+import app.shelfmark.ui.components.label
+import app.shelfmark.ui.theme.Dimens
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.text.input.ImeAction
 import app.shelfmark.ui.components.formatDate
 import app.shelfmark.data.coverModel
 import java.time.Instant
@@ -64,15 +72,15 @@ fun ProgressCard(book: Book, onSetPage: (Int?) -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clickable(role = Role.Button, onClickLabel = stringResource(R.string.update_progress)) { editing = true }
-            .padding(18.dp),
+            .padding(Dimens.cardPadding),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.progress), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.progress), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             progress?.let {
-                Text(stringResource(R.string.progress_percent, (it * 100).toInt()), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.progress_percent, (it * 100).toInt()), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -107,7 +115,8 @@ private fun PageDialog(book: Book, onDismiss: () -> Unit, onSave: (Int?) -> Unit
                 label = { Text(stringResource(R.string.current_page)) },
                 suffix = total?.let { { Text(stringResource(R.string.of_pages, it)) } },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onSave(text.toIntOrNull()) }),
             )
         },
         confirmButton = { TextButton(onClick = { onSave(text.toIntOrNull()) }) { Text(stringResource(R.string.save)) } },
@@ -124,9 +133,9 @@ fun LendingSection(book: Book, onLend: (String) -> Unit, onReturned: () -> Unit)
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
+                .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.tertiaryContainer)
-                .padding(horizontal = 18.dp, vertical = 14.dp),
+                .padding(start = Dimens.cardPadding, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Icons.Rounded.Handshake, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
@@ -138,13 +147,16 @@ fun LendingSection(book: Book, onLend: (String) -> Unit, onReturned: () -> Unit)
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onReturned) { Text(stringResource(R.string.returned)) }
+            TextButton(
+                onClick = onReturned,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary),
+            ) { Text(stringResource(R.string.returned)) }
         }
     } else {
-        OutlinedButton(onClick = { asking = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+        OutlinedButton(onClick = { asking = true }, modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeight)) {
             Icon(Icons.Rounded.Handshake, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.lend_out), style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.lend_out))
         }
     }
     if (asking) {
@@ -158,7 +170,8 @@ fun LendingSection(book: Book, onLend: (String) -> Unit, onReturned: () -> Unit)
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.lend_to_whom)) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) { onLend(name); asking = false } }),
                 )
             },
             confirmButton = {
@@ -180,39 +193,23 @@ fun SeriesSection(
     onAddNext: () -> Unit,
 ) {
     val series = book.series ?: return
-    Spacer(Modifier.height(36.dp))
-    Text(stringResource(R.string.series_title, series), style = MaterialTheme.typography.titleLarge)
-    Spacer(Modifier.height(10.dp))
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        books.forEach { b ->
-            val current = b.id == book.id
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (current) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow)
-                    .clickable(enabled = !current) { onOpen(b.id) }
-                    .padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BookCover(b.coverModel(), b.title, Modifier.width(36.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        listOfNotNull(b.seriesNumber?.let { stringResource(R.string.series_position, it) }, b.title).joinToString("  "),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (current) FontWeight.SemiBold else null,
-                    )
-                    Text(
-                        stringResource(shelfName(b.shelf)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+    Spacer(Modifier.height(Dimens.sectionGap))
+    SectionTitle(stringResource(R.string.series_title, series))
+    InfoCard(padding = false) {
+        Column(Modifier.padding(8.dp)) {
+            books.forEach { b ->
+                val current = b.id == book.id
+                CompactBookRow(
+                    cover = b.coverModel(),
+                    title = listOfNotNull(b.seriesNumber?.let { stringResource(R.string.series_position, it) }, b.title).joinToString("  "),
+                    subtitle = stringResource(b.shelf.label),
+                    onClick = if (current) null else { { onOpen(b.id) } },
+                    current = current,
+                )
             }
         }
     }
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(Dimens.headerGap))
     when (next) {
         is NextState.Found -> {
             val owned = next.next.owned
@@ -222,19 +219,23 @@ fun SeriesSection(
             )
             Spacer(Modifier.height(8.dp))
             if (owned != null) {
-                OutlinedButton(onClick = { onOpen(owned.id) }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { onOpen(owned.id) }, modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeight)) {
                     Text(stringResource(R.string.open_book))
                 }
             } else {
-                OutlinedButton(onClick = onAddNext, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onAddNext, modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeight)) {
                     Text(stringResource(R.string.add_to_want))
                 }
             }
         }
         else -> {
-            OutlinedButton(onClick = onFindNext, enabled = next != NextState.Searching, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = onFindNext,
+                enabled = next != NextState.Searching,
+                modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeight),
+            ) {
                 if (next == NextState.Searching) {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                    ButtonSpinner()
                     Spacer(Modifier.width(10.dp))
                 }
                 Text(stringResource(R.string.find_next_in_series))
@@ -252,12 +253,6 @@ fun SeriesSection(
 private fun NoteText(text: String) {
     Spacer(Modifier.height(6.dp))
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-private fun shelfName(shelf: Shelf) = when (shelf) {
-    Shelf.Read -> R.string.shelf_read
-    Shelf.Reading -> R.string.shelf_reading
-    Shelf.WantToRead -> R.string.shelf_want
 }
 
 /**

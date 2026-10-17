@@ -5,7 +5,6 @@ import app.shelfmark.ui.icons.AutoAwesome
 import app.shelfmark.data.ImportException
 import app.shelfmark.ui.icons.FileUpload
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
-import app.shelfmark.ui.components.icon
 import app.shelfmark.ui.components.colors
 import app.shelfmark.ui.components.ShelfBadge
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -115,6 +114,14 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.data.Book
 import app.shelfmark.data.coverModel
 import app.shelfmark.ui.components.BookCover
+import app.shelfmark.ui.components.CoverSize
+import app.shelfmark.ui.components.EmptyState
+import app.shelfmark.ui.components.LoadingState
+import app.shelfmark.ui.components.icon
+import app.shelfmark.ui.theme.Dimens
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import app.shelfmark.ui.components.FinishButton
 import app.shelfmark.ui.components.FinishSheet
 import app.shelfmark.ui.components.RatingBar
@@ -161,19 +168,26 @@ fun LibraryScreen(
                 ExtendedFloatingActionButton(
                     onClick = { onScan(state.shelf) },
                     icon = { Icon(Icons.Rounded.QrCodeScanner, contentDescription = null) },
-                    text = { Text(stringResource(R.string.scan_a_book), style = MaterialTheme.typography.labelLarge) },
+                    text = { Text(stringResource(R.string.scan_a_book)) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 )
             }
         },
     ) { padding ->
+        if (!state.loaded) {
+            LoadingState(Modifier.padding(padding))
+            return@Scaffold
+        }
+        val layoutDirection = LocalLayoutDirection.current
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            // Scrolls under the system bars on every side, as far as the content allows.
             contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
+                start = padding.calculateStartPadding(layoutDirection) + Dimens.gutter,
+                end = padding.calculateEndPadding(layoutDirection) + Dimens.gutter,
                 top = padding.calculateTopPadding() + 20.dp,
+                // Room for the scan button over the last book.
                 bottom = padding.calculateBottomPadding() + 112.dp,
             ),
         ) {
@@ -216,7 +230,6 @@ fun LibraryScreen(
                 }
             }
             when {
-                !state.loaded -> Unit
                 state.totalCount == 0 -> item(key = "empty") {
                     EmptyLibrary(
                         onScan = { onScan(Shelf.Read) },
@@ -224,8 +237,19 @@ fun LibraryScreen(
                         onImport = import,
                     )
                 }
-                state.books.isEmpty() && query.isBlank() && state.filter == null -> item(key = "emptyShelf") { EmptyShelf(state.shelf) }
-                state.books.isEmpty() -> item(key = "none") { NoResults(query) }
+                state.books.isEmpty() && query.isBlank() && state.filter == null -> item(key = "emptyShelf") {
+                    EmptyShelf(state.shelf, onScan = { onScan(state.shelf) })
+                }
+                state.books.isEmpty() -> item(key = "none") {
+                    NoResults(
+                        query,
+                        onClear = {
+                            searchText = ""
+                            vm.setQuery("")
+                            vm.setFilter(null)
+                        },
+                    )
+                }
                 else -> items(state.books, key = { it.id }) { book ->
                     Column(Modifier.animateItem()) {
                         BookRow(book, onClick = { onOpen(book.id) }, onFinish = { vm.finish(book) })
@@ -306,7 +330,7 @@ private fun SearchField(query: String, onChange: (String) -> Unit, modifier: Mod
         },
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyLarge,
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         // The list filters as you type; the Search key just puts the keyboard away.
         keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
@@ -329,7 +353,7 @@ private fun SortRow(sort: SortMode, onChange: (SortMode) -> Unit, modifier: Modi
             FilterChip(
                 selected = mode == sort,
                 onClick = { onChange(mode) },
-                label = { Text(stringResource(mode.label), style = MaterialTheme.typography.labelMedium) },
+                label = { Text(stringResource(mode.label)) },
             )
         }
     }
@@ -347,7 +371,7 @@ private fun FilterRow(state: LibraryState, onChange: (String?) -> Unit, modifier
             FilterChip(
                 selected = selected,
                 onClick = { onChange(if (selected) null else LENT_FILTER) },
-                label = { Text(stringResource(R.string.lent_out_count, state.lentCount), style = MaterialTheme.typography.labelMedium) },
+                label = { Text(stringResource(R.string.lent_out_count, state.lentCount)) },
                 leadingIcon = { Icon(Icons.Rounded.Handshake, contentDescription = null, modifier = Modifier.size(16.dp)) },
             )
         }
@@ -356,7 +380,7 @@ private fun FilterRow(state: LibraryState, onChange: (String?) -> Unit, modifier
             FilterChip(
                 selected = selected,
                 onClick = { onChange(if (selected) null else tag) },
-                label = { Text(tag, style = MaterialTheme.typography.labelMedium) },
+                label = { Text(tag) },
                 leadingIcon = { Icon(Icons.Rounded.Sell, contentDescription = null, modifier = Modifier.size(16.dp)) },
             )
         }
@@ -368,12 +392,12 @@ private fun BookRow(book: Book, onClick: () -> Unit, onFinish: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        BookCover(book.coverModel(), book.title, Modifier.width(68.dp), elevation = 3.dp)
+        BookCover(book.coverModel(), book.title, CoverSize.Standard)
         Spacer(Modifier.width(20.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -470,43 +494,20 @@ private fun BookRow(book: Book, onClick: () -> Unit, onFinish: () -> Unit) {
 
 @Composable
 private fun EmptyLibrary(onScan: () -> Unit, onAddByHand: () -> Unit, onImport: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 56.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    EmptyState(
+        title = stringResource(R.string.empty_title),
+        body = stringResource(R.string.empty_body),
+        illustration = { StackOfBooks() },
+        modifier = Modifier.padding(top = 8.dp),
     ) {
-        StackOfBooks()
-        Spacer(Modifier.height(36.dp))
-        Text(
-            stringResource(R.string.empty_title),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            stringResource(R.string.empty_body),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 360.dp),
-        )
-        Spacer(Modifier.height(28.dp))
-        Button(
-            onClick = onScan,
-            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp),
-        ) {
+        Button(onClick = onScan, contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp)) {
             Icon(Icons.Rounded.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.scan_first_book), style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.scan_first_book))
         }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onAddByHand) {
-            Text(stringResource(R.string.add_by_hand), style = MaterialTheme.typography.labelLarge)
-        }
-        TextButton(onClick = onImport) {
-            Text(stringResource(R.string.import_from_backup), style = MaterialTheme.typography.labelLarge)
-        }
+        TextButton(onClick = onAddByHand) { Text(stringResource(R.string.add_by_hand)) }
+        TextButton(onClick = onImport) { Text(stringResource(R.string.import_from_backup)) }
     }
 }
 
@@ -557,7 +558,7 @@ private fun LibraryMenu(
             if (canExport) {
                 Text(
                     stringResource(R.string.export_library),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
@@ -741,10 +742,10 @@ private fun ReleasesCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.primaryContainer)
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+            .padding(Dimens.cardPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -766,43 +767,33 @@ private fun ReleasesCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun EmptyShelf(shelf: Shelf) {
-    Text(
-        stringResource(
+private fun EmptyShelf(shelf: Shelf, onScan: () -> Unit) {
+    EmptyState(
+        title = null,
+        icon = shelf.icon,
+        body = stringResource(
             when (shelf) {
                 Shelf.Read -> R.string.empty_shelf_read
                 Shelf.Reading -> R.string.empty_shelf_reading
                 Shelf.WantToRead -> R.string.empty_shelf_want
             },
         ),
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 48.dp, start = 12.dp, end = 12.dp),
-    )
+    ) {
+        Button(onClick = onScan) {
+            Icon(Icons.Rounded.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.scan_a_book))
+        }
+    }
 }
 
 @Composable
-private fun NoResults(query: String) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+private fun NoResults(query: String, onClear: () -> Unit) {
+    EmptyState(
+        title = if (query.isBlank()) null else stringResource(R.string.no_results, query.trim()),
+        body = stringResource(R.string.no_results_hint),
+        icon = Icons.Rounded.Search,
     ) {
-        Text(
-            stringResource(R.string.no_results, query.trim()),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.no_results_hint),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        TextButton(onClick = onClear) { Text(stringResource(R.string.clear_search)) }
     }
 }

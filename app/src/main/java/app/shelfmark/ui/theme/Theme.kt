@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 val LocalStarColor = staticCompositionLocalOf { StarLight }
+val LocalExtendedColors = staticCompositionLocalOf { LightExtendedColors }
 
 private val ShelfmarkShapes = Shapes(
     extraSmall = RoundedCornerShape(6.dp),
@@ -26,7 +27,10 @@ fun ShelfmarkTheme(
     content: @Composable () -> Unit,
 ) {
     val star: Color = if (darkTheme) StarDark else StarLight
-    CompositionLocalProvider(LocalStarColor provides star) {
+    CompositionLocalProvider(
+        LocalStarColor provides star,
+        LocalExtendedColors provides if (darkTheme) DarkExtendedColors else LightExtendedColors,
+    ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColors else LightColors,
             typography = ShelfmarkTypography,

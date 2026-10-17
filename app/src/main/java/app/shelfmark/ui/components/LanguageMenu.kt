@@ -12,6 +12,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
 import app.shelfmark.R
@@ -30,24 +32,26 @@ private enum class AppLanguage(val tag: String, @StringRes val label: Int) {
 @Composable
 fun LanguageMenuItems(onChosen: () -> Unit) {
     val current = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-    val selected = AppLanguage.entries.firstOrNull { it.tag.isNotEmpty() && current.startsWith(it.tag) }
+    val chosen = AppLanguage.entries.firstOrNull { it.tag.isNotEmpty() && current.startsWith(it.tag) }
         ?: AppLanguage.System
 
     Text(
         stringResource(R.string.language),
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
     )
     AppLanguage.entries.forEach { language ->
         DropdownMenuItem(
             text = { Text(stringResource(language.label)) },
+            // TalkBack says which language is in use, as the check mark shows.
+            modifier = Modifier.semantics { selected = language == chosen },
             trailingIcon = {
-                if (language == selected) Icon(Icons.Rounded.Check, contentDescription = null)
+                if (language == chosen) Icon(Icons.Rounded.Check, contentDescription = null)
             },
             onClick = {
                 onChosen()
-                if (language != selected) {
+                if (language != chosen) {
                     AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language.tag))
                 }
             },

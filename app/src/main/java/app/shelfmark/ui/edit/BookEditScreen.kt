@@ -65,10 +65,24 @@ import app.shelfmark.data.CatalogRecord
 import app.shelfmark.data.ReleaseFinder
 import app.shelfmark.data.coverModel
 import app.shelfmark.data.personName
+import app.shelfmark.ui.components.BarSpinner
 import app.shelfmark.ui.components.BookCover
+import app.shelfmark.ui.components.ButtonSpinner
+import app.shelfmark.ui.components.CompactBookRow
+import app.shelfmark.ui.components.CoverSize
+import app.shelfmark.ui.components.EmptyState
+import app.shelfmark.ui.components.InfoCard
+import app.shelfmark.ui.components.RatingPicker
+import app.shelfmark.ui.components.ShelfmarkTopBar
+import app.shelfmark.ui.icons.TaskAlt
+import app.shelfmark.ui.scan.isbnInput
+import app.shelfmark.ui.scan.isbnLooksWrong
+import app.shelfmark.ui.theme.Dimens
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.style.TextAlign
 import app.shelfmark.ui.components.CoverShape
-import app.shelfmark.ui.components.RatingBar
-import app.shelfmark.ui.components.ratingLabel
 import app.shelfmark.ui.components.rememberRepository
 import app.shelfmark.ui.theme.ReadingStyle
 
@@ -90,32 +104,34 @@ fun BookEditScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val book = state.book
     val isNew = bookId == 0L
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(state.savedId) { state.savedId?.let(onSaved) }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val fullWidth = Modifier.fillMaxWidth()
+    val nextField = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(if (isNew) R.string.new_book else R.string.edit_details), style = MaterialTheme.typography.titleLarge) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            ShelfmarkTopBar(
+                title = stringResource(if (isNew) R.string.new_book else R.string.edit_details),
+                onBack = onBack,
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .consumeWindowInsets(padding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(top = 8.dp, bottom = 32.dp),
+                // Inside the scroll, so the form scrolls under the top bar and the navigation bar.
+                .padding(padding)
+                .padding(horizontal = Dimens.gutter)
+                .padding(top = Dimens.topGap, bottom = Dimens.bottomGap),
         ) {
             val duplicate = state.duplicateOf
             if (duplicate != null) {
@@ -127,69 +143,52 @@ fun BookEditScreen(
                     backLabel = if (hasForm) R.string.back_to_form else R.string.go_back,
                 )
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.width(108.dp)) {
-                        BookCover(book.coverModel(), book.title, Modifier.fillMaxWidth(), elevation = 8.dp)
-                        if (state.loading) {
-                            Box(
-                                Modifier
-                                    .matchParentSize()
-                                    .clip(CoverShape)
-                                    .background(Color.Black.copy(alpha = 0.45f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(28.dp))
-                            }
-                        }
-                    }
-                    Spacer(Modifier.width(20.dp))
-                    Column(Modifier.weight(1f)) {
-                        if (book.shelf == Shelf.Read) {
-                            Text(stringResource(R.string.your_rating), style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                ratingLabel(book.rating),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            Text(
-                                stringResource(R.string.rate_when_finished),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                // The same order as the book's page: cover, shelf, rating.
+                Box(Modifier.align(Alignment.CenterHorizontally)) {
+                    BookCover(book.coverModel(), book.title, CoverSize.Medium)
+                    if (state.loading) {
+                        Box(
+                            Modifier
+                                .matchParentSize()
+                                .clip(CoverShape)
+                                .background(Color.Black.copy(alpha = 0.45f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            BarSpinner(color = Color.White)
                         }
                     }
                 }
-
-                if (book.shelf == Shelf.Read) {
-                    // Full width, so each star is big enough to hit.
-                    Spacer(Modifier.height(12.dp))
-                    RatingBar(
-                        rating = book.rating,
-                        starSize = 40.dp,
-                        spacing = 6.dp,
-                        onRatingChange = { r -> vm.update { it.copy(rating = r) } },
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                    )
-                }
-                Spacer(Modifier.height(20.dp))
-                ShelfSelector(book.shelf, onChange = { s -> vm.update { it.copy(shelf = s) } })
-
                 if (state.loading) {
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(Dimens.headerGap))
                     Text(
                         stringResource(R.string.finding_isbn, book.isbn.orEmpty()),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                Spacer(Modifier.height(20.dp))
+                ShelfSelector(book.shelf, onChange = { s -> vm.update { it.copy(shelf = s) } })
+                Spacer(Modifier.height(Dimens.headerGap))
+                if (book.shelf == Shelf.Read) {
+                    InfoCard { RatingPicker(book.rating, onRatingChange = { r -> vm.update { it.copy(rating = r) } }) }
+                } else {
+                    Text(
+                        stringResource(R.string.rate_when_finished),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
                 state.message?.let {
                     Spacer(Modifier.height(20.dp))
                     Notice(
                         when (it) {
                             EditMessage.InvalidIsbn -> stringResource(R.string.msg_invalid_isbn)
-                            EditMessage.Offline -> stringResource(R.string.msg_offline)
+                            is EditMessage.Offline -> stringResource(R.string.msg_offline)
                             is EditMessage.NotFound -> stringResource(R.string.msg_not_found, it.isbn)
                             is EditMessage.IsbnMismatch -> if (it.found.authors.isBlank()) {
                                 stringResource(R.string.msg_isbn_mismatch_no_author, it.isbn, it.found.title)
@@ -198,7 +197,11 @@ fun BookEditScreen(
                             }
                             EditMessage.NoTitleMatches -> stringResource(R.string.msg_no_title_matches)
                         },
-                        action = (it as? EditMessage.IsbnMismatch)?.let { stringResource(R.string.use_this_book) to vm::useMismatch },
+                        action = when (it) {
+                            is EditMessage.IsbnMismatch -> stringResource(R.string.use_this_book) to vm::useMismatch
+                            is EditMessage.Offline -> stringResource(R.string.try_again) to vm::retry
+                            else -> null
+                        },
                     )
                 }
 
@@ -208,33 +211,37 @@ fun BookEditScreen(
                         value = book.title,
                         onValueChange = { v -> vm.update { it.copy(title = v) } },
                         label = { Text(stringResource(R.string.title)) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = fullWidth,
                         textStyle = MaterialTheme.typography.bodyLarge,
                         maxLines = 3,
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.Words,
                             imeAction = ImeAction.Next,
                         ),
+                        keyboardActions = nextField,
                     )
                     OutlinedTextField(
                         value = book.authors,
                         onValueChange = { v -> vm.update { it.copy(authors = v) } },
                         label = { Text(stringResource(R.string.author)) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = fullWidth,
                         textStyle = MaterialTheme.typography.bodyLarge,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.Words,
                             imeAction = ImeAction.Next,
                         ),
+                        keyboardActions = nextField,
                     )
                     OutlinedButton(
                         onClick = vm::searchTitle,
                         enabled = book.title.isNotBlank() && !state.searching && !state.loading,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(Dimens.buttonHeight),
                     ) {
                         if (state.searching) {
-                            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                            ButtonSpinner()
                         } else {
                             Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                         }
@@ -244,20 +251,24 @@ fun BookEditScreen(
                     state.results?.takeIf { it.isNotEmpty() }?.let { results ->
                         SearchResults(results, onPick = vm::pick, onClose = vm::closeResults)
                     }
+                    // Checked as it is typed, like in the scanner's ISBN dialog.
+                    val isbnWrong = isbnLooksWrong(book.isbn.orEmpty())
                     OutlinedTextField(
                         value = book.isbn.orEmpty(),
-                        onValueChange = { v -> vm.update { it.copy(isbn = v.take(17).ifBlank { null }) } },
+                        onValueChange = { v -> vm.update { it.copy(isbn = isbnInput(v).ifBlank { null }) } },
                         label = { Text(stringResource(R.string.isbn)) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = fullWidth,
                         textStyle = MaterialTheme.typography.bodyLarge,
                         singleLine = true,
-                        supportingText = { Text(stringResource(R.string.isbn_supporting)) },
+                        isError = isbnWrong,
+                        supportingText = { Text(stringResource(if (isbnWrong) R.string.isbn_invalid else R.string.isbn_supporting)) },
                         trailingIcon = {
                             IconButton(
                                 onClick = vm::lookupIsbn,
                                 enabled = !state.loading && !book.isbn.isNullOrBlank(),
                             ) { Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.look_up_isbn)) }
                         },
+                        // Search looks the book up, which fills in most of the fields below.
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { vm.lookupIsbn() }),
                     )
@@ -269,6 +280,8 @@ fun BookEditScreen(
                             modifier = Modifier.weight(1f),
                             textStyle = MaterialTheme.typography.bodyLarge,
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            keyboardActions = nextField,
                         )
                         OutlinedTextField(
                             value = book.pageCount?.toString().orEmpty(),
@@ -279,7 +292,8 @@ fun BookEditScreen(
                             modifier = Modifier.weight(1f),
                             textStyle = MaterialTheme.typography.bodyLarge,
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                            keyboardActions = nextField,
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -290,7 +304,8 @@ fun BookEditScreen(
                             modifier = Modifier.weight(2f),
                             textStyle = MaterialTheme.typography.bodyLarge,
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+                            keyboardActions = nextField,
                         )
                         OutlinedTextField(
                             value = book.seriesNumber.orEmpty(),
@@ -301,26 +316,36 @@ fun BookEditScreen(
                             modifier = Modifier.weight(1f),
                             textStyle = MaterialTheme.typography.bodyLarge,
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                            keyboardActions = nextField,
                         )
                     }
                     FormatSelector(book.format, onChange = { f -> vm.update { it.copy(format = f) } })
+                    val notesShown = book.shelf == Shelf.Read || book.notes.isNotBlank()
                     OutlinedTextField(
                         value = book.tags.orEmpty(),
                         onValueChange = { v -> vm.update { it.copy(tags = v.ifEmpty { null }) } },
                         label = { Text(stringResource(R.string.tags)) },
                         supportingText = { Text(stringResource(R.string.tags_supporting)) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = fullWidth,
                         textStyle = MaterialTheme.typography.bodyLarge,
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        // Tags are often lower case ("book club"); the last field closes the keyboard.
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            imeAction = if (notesShown) ImeAction.Next else ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                            onDone = { focusManager.clearFocus() },
+                        ),
                     )
-                    if (book.shelf == Shelf.Read || book.notes.isNotBlank()) OutlinedTextField(
+                    if (notesShown) OutlinedTextField(
                         value = book.notes,
                         onValueChange = { v -> vm.update { it.copy(notes = v) } },
                         label = { Text(stringResource(R.string.your_notes)) },
                         placeholder = { Text(stringResource(R.string.notes_placeholder), style = ReadingStyle) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = fullWidth,
                         textStyle = ReadingStyle.copy(color = MaterialTheme.colorScheme.onSurface),
                         minLines = 6,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -333,9 +358,9 @@ fun BookEditScreen(
                     enabled = book.title.isNotBlank() && !state.saving && !state.loading,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(Dimens.buttonHeight),
                 ) {
-                    Text(stringResource(if (isNew) R.string.save_to_library else R.string.save_changes), style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(if (isNew) R.string.save_to_library else R.string.save_changes))
                 }
                 if (book.title.isBlank() && !state.loading) {
                     Spacer(Modifier.height(8.dp))
@@ -379,9 +404,9 @@ private fun Notice(text: String, action: Pair<String, () -> Unit>? = null) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(16.dp),
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(Dimens.cardPadding),
         verticalAlignment = Alignment.Top,
     ) {
         Icon(
@@ -403,37 +428,21 @@ private fun Notice(text: String, action: Pair<String, () -> Unit>? = null) {
 /** Editions found by title; tapping one fills in the form. */
 @Composable
 private fun SearchResults(results: List<CatalogRecord>, onPick: (CatalogRecord) -> Unit, onClose: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(vertical = 8.dp),
-    ) {
+    InfoCard(padding = false) {
         Text(
             stringResource(R.string.pick_edition),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(start = Dimens.cardPadding, end = Dimens.cardPadding, top = Dimens.cardPadding, bottom = 4.dp),
         )
-        results.forEach { r ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onPick(r) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BookCover(r.coverUrl, r.title, Modifier.width(40.dp), elevation = 2.dp)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(ReleaseFinder.displayTitle(r.title), style = MaterialTheme.typography.bodyLarge, maxLines = 2)
-                    r.creators.firstOrNull()?.let {
-                        Text(personName(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    listOfNotNull(r.publisher, r.year?.toString(), r.isbn).joinToString(" · ").takeIf { it.isNotEmpty() }?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+        Column(Modifier.padding(horizontal = 8.dp)) {
+            results.forEach { r ->
+                CompactBookRow(
+                    cover = r.coverUrl,
+                    title = ReleaseFinder.displayTitle(r.title),
+                    subtitle = r.creators.firstOrNull()?.let(::personName),
+                    detail = listOfNotNull(r.publisher, r.year?.toString(), r.isbn).joinToString(" · ").ifEmpty { null },
+                    onClick = { onPick(r) },
+                )
             }
         }
         TextButton(onClick = onClose, modifier = Modifier.padding(horizontal = 8.dp)) { Text(stringResource(R.string.close)) }
@@ -442,25 +451,12 @@ private fun SearchResults(results: List<CatalogRecord>, onPick: (CatalogRecord) 
 
 @Composable
 private fun AlreadyInLibrary(onOpen: () -> Unit, onBack: () -> Unit, backLabel: Int) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    EmptyState(
+        title = stringResource(R.string.already_logged_title),
+        body = stringResource(R.string.already_logged_body),
+        icon = Icons.Rounded.TaskAlt,
     ) {
-        Text(stringResource(R.string.already_logged_title), style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(10.dp))
-        Text(
-            stringResource(R.string.already_logged_body),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(onClick = onOpen, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text(stringResource(R.string.open_book), style = MaterialTheme.typography.labelLarge)
-        }
-        TextButton(onClick = onBack) {
-            Text(stringResource(backLabel), style = MaterialTheme.typography.labelLarge)
-        }
+        Button(onClick = onOpen) { Text(stringResource(R.string.open_book)) }
+        TextButton(onClick = onBack) { Text(stringResource(backLabel)) }
     }
 }

@@ -95,7 +95,9 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.shelfmark.ui.components.rememberRepository
-import app.shelfmark.ui.theme.StarDark
+import app.shelfmark.ui.components.BarSpinner
+import app.shelfmark.ui.components.EmptyState
+import app.shelfmark.ui.theme.CameraColors
 import java.util.concurrent.Executors
 import kotlin.math.min
 
@@ -134,7 +136,7 @@ fun ScanScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(CameraColors.background),
     ) {
         when {
             // The dialog's ISBN and a barcode seen behind it would both open a new book.
@@ -160,13 +162,13 @@ fun ScanScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back), tint = Color.White)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back), tint = CameraColors.content)
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = { showIsbnDialog = true }) {
-                Icon(Icons.Rounded.Keyboard, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(Icons.Rounded.Keyboard, contentDescription = null, tint = CameraColors.content, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.type_isbn_short), color = Color.White, style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.type_isbn_short), color = CameraColors.content)
             }
         }
     }
@@ -288,7 +290,7 @@ private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit, p
         ) {
             Text(
                 stringResource(error ?: mode.hint),
-                color = if (error != null) StarDark else Color.White,
+                color = if (error != null) CameraColors.error else CameraColors.content,
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp),
@@ -334,14 +336,14 @@ private fun Viewfinder(mode: ScanMode) {
         val frame = androidx.compose.ui.geometry.Size(w, h)
         val radius = CornerRadius(18.dp.toPx())
 
-        drawRect(Color.Black.copy(alpha = 0.55f))
+        drawRect(CameraColors.scrim)
         drawRoundRect(Color.Transparent, topLeft, frame, radius, blendMode = BlendMode.Clear)
-        drawRoundRect(Color.White, topLeft, frame, radius, style = Stroke(width = 2.5.dp.toPx()))
+        drawRoundRect(CameraColors.content, topLeft, frame, radius, style = Stroke(width = 2.5.dp.toPx()))
 
         if (morph < 1f) {
             val y = topLeft.y + h * (0.18f + 0.64f * sweep)
             drawLine(
-                color = StarDark.copy(alpha = 1f - morph),
+                color = CameraColors.accent.copy(alpha = 1f - morph),
                 start = Offset(topLeft.x + 20.dp.toPx(), y),
                 end = Offset(topLeft.x + w - 20.dp.toPx(), y),
                 strokeWidth = 2.5.dp.toPx(),
@@ -355,15 +357,15 @@ private fun ShutterButton(capturing: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
             .size(76.dp)
-            .border(4.dp, Color.White, CircleShape)
+            .border(4.dp, CameraColors.content, CircleShape)
             .padding(8.dp)
             .clip(CircleShape)
-            .background(if (capturing) Color.White.copy(alpha = 0.5f) else Color.White)
+            .background(if (capturing) CameraColors.content.copy(alpha = 0.5f) else CameraColors.content)
             .clickable(enabled = !capturing, onClickLabel = stringResource(R.string.take_cover_photo), role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (capturing) {
-            CircularProgressIndicator(color = Color.Black, strokeWidth = 3.dp, modifier = Modifier.size(28.dp))
+            BarSpinner(color = CameraColors.background)
         }
     }
 }
@@ -373,17 +375,17 @@ private fun ModeSwitch(mode: ScanMode, onChange: (ScanMode) -> Unit) {
     Row(
         Modifier
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.5f))
+            .background(CameraColors.controls)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         ScanMode.entries.forEach { m ->
             val selected = m == mode
-            val fg = if (selected) Color.Black else Color.White
+            val fg = if (selected) CameraColors.background else CameraColors.content
             Row(
                 Modifier
                     .clip(CircleShape)
-                    .background(if (selected) Color.White else Color.Transparent)
+                    .background(if (selected) CameraColors.content else Color.Transparent)
                     .selectable(selected = selected, role = Role.Tab, onClick = { onChange(m) })
                     .padding(horizontal = 18.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -401,42 +403,25 @@ private fun PermissionNeeded(onAllow: (() -> Unit)?, onOpenSettings: () -> Unit,
     Column(
         Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(Icons.Rounded.PhotoCamera, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
-        Spacer(Modifier.height(20.dp))
-        Text(
-            stringResource(R.string.camera_off_title),
-            color = Color.White,
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            stringResource(R.string.camera_off_body),
-            color = Color.White.copy(alpha = 0.8f),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 360.dp),
-        )
-        Spacer(Modifier.height(28.dp))
-        val white = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
-        if (onAllow != null) {
-            Button(onClick = onAllow, colors = white) {
-                Text(stringResource(R.string.allow_camera), style = MaterialTheme.typography.labelLarge)
+        EmptyState(
+            title = stringResource(R.string.camera_off_title),
+            body = stringResource(R.string.camera_off_body),
+            icon = Icons.Rounded.PhotoCamera,
+            contentColor = CameraColors.content,
+            secondaryColor = CameraColors.contentDim,
+        ) {
+            val light = ButtonDefaults.buttonColors(containerColor = CameraColors.content, contentColor = CameraColors.background)
+            val onDark = ButtonDefaults.textButtonColors(contentColor = CameraColors.content)
+            if (onAllow != null) {
+                Button(onClick = onAllow, colors = light) { Text(stringResource(R.string.allow_camera)) }
+                TextButton(onClick = onOpenSettings, colors = onDark) { Text(stringResource(R.string.open_settings)) }
+            } else {
+                Button(onClick = onOpenSettings, colors = light) { Text(stringResource(R.string.open_settings)) }
             }
-            TextButton(onClick = onOpenSettings) {
-                Text(stringResource(R.string.open_settings), color = Color.White, style = MaterialTheme.typography.labelLarge)
-            }
-        } else {
-            Button(onClick = onOpenSettings, colors = white) {
-                Text(stringResource(R.string.open_settings), style = MaterialTheme.typography.labelLarge)
-            }
-        }
-        TextButton(onClick = onTypeIsbn) {
-            Text(stringResource(R.string.type_isbn_instead), color = Color.White, style = MaterialTheme.typography.labelLarge)
+            TextButton(onClick = onTypeIsbn, colors = onDark) { Text(stringResource(R.string.type_isbn_instead)) }
         }
     }
 }

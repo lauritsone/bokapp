@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.shelfmark.R
 import app.shelfmark.data.Book
+import app.shelfmark.ui.theme.Dimens
 import app.shelfmark.ui.theme.ReadingStyle
 
 /** The button on books being read: moves the book to Read. */
@@ -48,12 +49,13 @@ import app.shelfmark.ui.theme.ReadingStyle
 fun FinishButton(onClick: () -> Unit, modifier: Modifier = Modifier, large: Boolean = false) {
     FilledTonalButton(
         onClick = onClick,
-        modifier = if (large) modifier.fillMaxWidth().height(52.dp) else modifier.height(36.dp),
+        // The small one keeps the standard height, so it stays easy to hit.
+        modifier = if (large) modifier.fillMaxWidth().height(Dimens.buttonHeight) else modifier,
         contentPadding = if (large) ButtonDefaults.ContentPadding else ButtonDefaults.ButtonWithIconContentPadding,
     ) {
         Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.mark_finished), style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.mark_finished))
     }
 }
 
@@ -78,8 +80,8 @@ fun FinishSheet(
                 .fillMaxWidth()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp)
+                .padding(horizontal = Dimens.gutter)
+                .padding(bottom = Dimens.bottomGap)
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -96,19 +98,13 @@ fun FinishSheet(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(20.dp))
-            RatingBar(rating = rating, starSize = 44.dp, spacing = 4.dp, onRatingChange = { rating = it })
-            Spacer(Modifier.height(6.dp))
-            Text(
-                ratingLabel(rating),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            RatingPicker(rating, onRatingChange = { rating = it })
             Spacer(Modifier.height(20.dp))
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 4,
+                minLines = 6,
                 label = { Text(stringResource(R.string.your_notes)) },
                 placeholder = { Text(stringResource(R.string.notes_placeholder), style = ReadingStyle) },
                 textStyle = ReadingStyle.copy(color = MaterialTheme.colorScheme.onSurface),
