@@ -9,7 +9,8 @@ Everything is stored on the phone.
 - **Automatic lookup**: title, author, cover, publisher, page count and description come from Google Books, with Open Library as fallback. Neither needs an API key.
 - **Cover photo mode**: for books without a barcode, snap the cover and type the details. You can add an ISBN later and tap search to fill the rest in.
 - **Type the ISBN**: for worn or missing barcodes. ISBN-10 is converted to ISBN-13, and check digits are validated.
-- **Find by title**: when a barcode won't scan, type the title (and author if you like) and pick your edition from the National Library's catalogue or Open Library; it fills in the author, ISBN, publisher, year, pages, cover and blurb. Books saved without an author have a link on their page to do this. If a typed ISBN belongs to a different book than the title, you're told instead of the details being overwritten.
+- **Find by title**: when a barcode won't scan, type the title (and author if you like) and pick your edition from the National Library's catalogue or Open Library; it fills in the author, ISBN, publisher, year, pages, cover and blurb. If a typed ISBN belongs to a different book than the title, you're told instead of the details being overwritten.
+- **Find missing details**: the refresh button on a book's page (or *Find missing details* under its details) looks the book up again, by ISBN or by title and author, and fills in only what's missing: author, ISBN, publisher, year, pages, blurb and cover. Nothing you typed is overwritten. If several authors have a book with that title, you're asked to pick it from the edit screen.
 - **1–5 star rating**: tap to rate, tap the same star again to clear. Shown in the list and on each book.
 - **Your notes**: a serif writing area for thoughts, quotes and recommendations. Notes are searchable.
 - **Library**: search by title, author, ISBN or notes. Sort by recently added, highest rated, title or author.

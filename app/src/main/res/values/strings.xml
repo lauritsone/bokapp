@@ -217,4 +217,14 @@
     <string name="msg_isbn_mismatch">ISBN %1$s belongs to “%2$s” by %3$s, not the title you typed. Check the number, or find the book by title instead.</string>
     <string name="msg_no_title_matches">No book with that title in the catalogues. Check the spelling, or fill in the details yourself.</string>
     <string name="add_missing_details">Add the author and other missing details</string>
+    <string name="refresh_details">Look up details again</string>
+    <string name="find_missing_details">Find missing details</string>
+    <plurals name="refresh_updated">
+        <item quantity="one">Found %1$d missing detail.</item>
+        <item quantity="other">Found %1$d missing details.</item>
+    </plurals>
+    <string name="refresh_nothing_new">Found the book, but the catalogues have nothing it’s missing.</string>
+    <string name="refresh_not_found">Couldn’t find this book in the catalogues. Edit it to search by title, or check the spelling.</string>
+    <string name="refresh_ambiguous">Several authors have a book with this title. Edit it to pick the right one.</string>
+    <string name="refresh_offline">No connection to the book databases. Try again later.</string>
 </resources>

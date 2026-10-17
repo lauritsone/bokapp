@@ -30,6 +30,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import app.shelfmark.data.RefreshResult
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,9 +94,39 @@ fun BookDetailScreen(
     val book by vm.book.collectAsStateWithLifecycle()
     val askForReview by vm.askForReview.collectAsStateWithLifecycle()
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val refreshResult by vm.refreshResult.collectAsStateWithLifecycle()
+    val offline by vm.offline.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    LaunchedEffect(refreshResult, offline) {
+        val result = refreshResult
+        if (result == null && !offline) return@LaunchedEffect
+        val res = context.resources
+        val message = when (result) {
+            is RefreshResult.Updated -> res.getQuantityString(R.plurals.refresh_updated, result.filled, result.filled)
+            RefreshResult.NothingNew -> res.getString(R.string.refresh_nothing_new)
+            RefreshResult.NotFound -> res.getString(R.string.refresh_not_found)
+            RefreshResult.Ambiguous -> res.getString(R.string.refresh_ambiguous)
+            null -> res.getString(R.string.refresh_offline)
+        }
+        // Not found by itself: the edit screen can search by title and let the user pick.
+        val canPick = result == RefreshResult.NotFound || result == RefreshResult.Ambiguous
+        val choice = snackbar.showSnackbar(
+            message,
+            actionLabel = if (canPick) res.getString(R.string.edit) else null,
+            withDismissAction = canPick,
+            duration = if (canPick) SnackbarDuration.Long else SnackbarDuration.Short,
+        )
+        // Cleared only now: changing the keys earlier would cancel the snackbar.
+        vm.refreshShown()
+        if (choice == SnackbarResult.ActionPerformed) onEdit()
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = {},
@@ -96,6 +136,13 @@ fun BookDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = vm::refresh, enabled = book != null && !refreshing) {
+                        if (refreshing) {
+                            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.refresh_details))
+                        }
+                    }
                     IconButton(onClick = onEdit, enabled = book != null) {
                         Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.edit_details))
                     }
@@ -118,7 +165,8 @@ fun BookDetailScreen(
                 onFinish = vm::finish,
                 onSaveNotes = vm::saveNotes,
                 onUseForSuggestions = vm::setUseForSuggestions,
-                onEdit = onEdit,
+                onFindDetails = vm::refresh,
+                refreshing = refreshing,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -159,7 +207,8 @@ private fun DetailContent(
     onFinish: () -> Unit,
     onSaveNotes: (String) -> Unit,
     onUseForSuggestions: (Boolean) -> Unit,
-    onEdit: () -> Unit,
+    onFindDetails: () -> Unit,
+    refreshing: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -195,8 +244,8 @@ private fun DetailContent(
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
-            // Typed in by hand after a failed scan: the edit screen can find the rest by title.
-            TextButton(onClick = onEdit, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            // Typed in by hand after a failed scan: look the rest up in the catalogues.
+            TextButton(onClick = onFindDetails, enabled = !refreshing, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text(stringResource(R.string.add_missing_details), textAlign = TextAlign.Center)
             }
         }
@@ -270,6 +319,22 @@ private fun DetailContent(
                     )
                     Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 }
+            }
+        }
+        val missing = book.description.isNullOrBlank() || book.publisher == null || book.publishedDate == null ||
+            book.pageCount == null || book.isbn == null || (book.coverUrl == null && book.photoPath == null)
+        if (missing) {
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onFindDetails,
+                enabled = !refreshing,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.find_missing_details), style = MaterialTheme.typography.labelLarge)
             }
         }
 

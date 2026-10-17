@@ -182,6 +182,81 @@ class BookRepository(
         )
     }
 
+    /**
+     * Looks the book up again (by ISBN, else by title and author) and fills in the details
+     * it lacks, such as for a book typed in by hand. Nothing the user entered is overwritten.
+     * @throws IOException if no catalogue can be reached.
+     */
+    suspend fun refreshDetails(id: Long): RefreshResult = withContext(Dispatchers.IO) {
+        val book = dao.get(id) ?: return@withContext RefreshResult.NotFound
+        val info = when (val found = findDetails(book)) {
+            is Found.Info -> found.info
+            Found.Several -> return@withContext RefreshResult.Ambiguous
+            Found.None -> return@withContext RefreshResult.NotFound
+        }
+        val isbnTaken = info.isbn.isNotBlank() && dao.findByIsbn(info.isbn)?.let { it.id != id } == true
+        val updated = DetailRefresh.fillGaps(book, info, isbnTaken)
+        val filled = DetailRefresh.filled(book, updated)
+        // A cover not found before may be found now, with an ISBN or another try.
+        val retryCover = updated.photoPath == null && (updated.coverUrl == null || CoverFinder.isGuess(updated.coverUrl))
+        if (filled == 0) {
+            if (retryCover) {
+                dao.setCover(id, book.coverUrl, 0)
+                repairCovers()
+            }
+            return@withContext RefreshResult.NothingNew
+        }
+        // A blurb or author to go by changes the genres, so they are learned again.
+        save(updated.copy(genres = null, profiledAt = 0, coverCheckedAt = if (retryCover) 0 else updated.coverCheckedAt))
+        lastReleases = null
+        RefreshResult.Updated(filled)
+    }
+
+    private sealed interface Found {
+        data class Info(val info: BookInfo) : Found
+        data object None : Found
+        data object Several : Found
+    }
+
+    /** The catalogue's details for [book]. */
+    private suspend fun findDetails(book: Book): Found {
+        val isbn = book.isbn?.let(Isbn::normalize)
+        if (isbn != null) {
+            // An ISBN typed wrong points at another book; only trust it if the title agrees.
+            lookup(isbn)?.takeIf { DetailRefresh.sameTitle(book.title, it.title) }?.let { return Found.Info(it) }
+        }
+        if (book.title.isBlank()) return Found.None
+        val byAuthor = if (book.authors.isBlank()) emptyList() else searchCatalogue(book.title, book.authors)
+        val pick = DetailRefresh.pick(book.title, byAuthor, byAuthor = true).takeIf { it is DetailRefresh.PickResult.One }
+            // A typed author spelled differently from the catalogue: try the title alone.
+            ?: DetailRefresh.pick(book.title, searchCatalogue(book.title, ""), byAuthor = false, author = book.authors)
+        return when (pick) {
+            is DetailRefresh.PickResult.One -> {
+                val record = pick.record
+                val info = try {
+                    bookInfo(record)
+                } catch (e: JSONException) {
+                    return Found.None
+                }
+                // The search result may lack an ISBN cover that the ISBN lookup has.
+                val byIsbn = if (record.isbn != null && (info.coverUrl == null || info.description == null)) {
+                    runCatching { lookup(record.isbn) }.getOrNull()
+                } else {
+                    null
+                }
+                Found.Info(
+                    info.copy(
+                        coverUrl = info.coverUrl ?: byIsbn?.coverUrl,
+                        description = info.description ?: byIsbn?.description,
+                        pageCount = info.pageCount ?: byIsbn?.pageCount,
+                    ),
+                )
+            }
+            DetailRefresh.PickResult.Several -> Found.Several
+            DetailRefresh.PickResult.None -> Found.None
+        }
+    }
+
     /** Inserts or updates; returns the book's id. */
     suspend fun save(book: Book): Long {
         val now = System.currentTimeMillis()
