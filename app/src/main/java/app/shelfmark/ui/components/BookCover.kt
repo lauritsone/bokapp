@@ -5,6 +5,9 @@ import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import app.shelfmark.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
@@ -61,26 +64,33 @@ fun BookCover(
             .clip(CoverShape)
             .background(tone),
     ) {
-        val text = title.ifBlank { stringResource(R.string.untitled) }
-        val textWidth = maxWidth * (1f - CoverStartPadding - CoverEndPadding)
-        val fontSize = rememberCoverFontSize(text, textWidth, baseSize = (maxWidth.value / 7.5f).coerceIn(8f, 24f))
-        Text(
-            text = text,
-            color = Color.White.copy(alpha = 0.92f),
-            style = coverTitleStyle(fontSize).copy(hyphens = Hyphens.Auto),
-            maxLines = 5,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(
-                start = maxWidth * CoverStartPadding,
-                end = maxWidth * CoverEndPadding,
-                top = maxWidth * 0.12f,
-            ),
-        )
+        // Once the cover image is showing, the typeset title under it is skipped: measuring
+        // it for every cover scrolled into view is wasted work.
+        var loaded by remember(model) { mutableStateOf(false) }
+        if (!loaded) {
+            val text = title.ifBlank { stringResource(R.string.untitled) }
+            val textWidth = maxWidth * (1f - CoverStartPadding - CoverEndPadding)
+            val fontSize = rememberCoverFontSize(text, textWidth, baseSize = (maxWidth.value / 7.5f).coerceIn(8f, 24f))
+            Text(
+                text = text,
+                color = Color.White.copy(alpha = 0.92f),
+                style = coverTitleStyle(fontSize).copy(hyphens = Hyphens.Auto),
+                maxLines = 5,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(
+                    start = maxWidth * CoverStartPadding,
+                    end = maxWidth * CoverEndPadding,
+                    top = maxWidth * 0.12f,
+                ),
+            )
+        }
         if (model != null) {
             AsyncImage(
                 model = model,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                onSuccess = { loaded = true },
+                onError = { loaded = false },
                 modifier = Modifier.fillMaxSize(),
             )
         }

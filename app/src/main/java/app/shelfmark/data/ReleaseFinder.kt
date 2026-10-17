@@ -36,6 +36,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
 
     /** @throws IOException if the catalogue can't be reached at all. */
     suspend fun find(onProgress: (ReleaseProgress) -> Unit): ReleaseResult {
+        nb.pruneCache()
         learnGenres(onProgress)
         val library = dao.getAll()
         val profile = TasteProfile(library)
@@ -147,20 +148,25 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
 
     /** Looks up genres for library books that don't have them yet, a batch at a time. */
     private suspend fun learnGenres(onProgress: (ReleaseProgress) -> Unit) {
-        val pending = dao.getAll().filter { !it.ignoreForSuggestions && it.profiledAt < Genres.RULES_SINCE }.take(40)
+        val pending = dao.unprofiled(Genres.RULES_SINCE, limit = 40)
         if (pending.isEmpty()) return
         val done = AtomicInteger()
         onProgress(ReleaseProgress.LearningTaste(0, pending.size))
-        concurrently(pending) { book ->
-            try {
-                val tags = genresFor(book)
-                dao.setGenres(book.id, tags.takeIf { it.isNotEmpty() }?.let(Genres::encode), Genres.profiledNow())
-            } catch (e: IOException) {
-                // Offline or catalogue hiccup: try this book again next time.
-            } catch (e: JSONException) {
-                // An unexpected answer: try this book again next time.
+        // Saved a batch at a time, since each write redraws the library.
+        for (batch in pending.chunked(GENRE_BATCH)) {
+            val learned = ConcurrentHashMap<Long, java.util.Optional<String>>()
+            concurrently(batch) { book ->
+                try {
+                    val tags = genresFor(book)
+                    learned[book.id] = java.util.Optional.ofNullable(tags.takeIf { it.isNotEmpty() }?.let(Genres::encode))
+                } catch (e: IOException) {
+                    // Offline or catalogue hiccup: try this book again next time.
+                } catch (e: JSONException) {
+                    // An unexpected answer: try this book again next time.
+                }
+                onProgress(ReleaseProgress.LearningTaste(done.incrementAndGet(), pending.size))
             }
-            onProgress(ReleaseProgress.LearningTaste(done.incrementAndGet(), pending.size))
+            if (learned.isNotEmpty()) dao.setGenres(learned.mapValues { it.value.orElse(null) }, Genres.profiledNow())
         }
     }
 
@@ -182,7 +188,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
     /** Title → the earliest year the catalogue has it, for one author's books in Norwegian. */
     private suspend fun firstYears(author: String): Map<String, Int> {
         val name = personName(author)
-        return nb.search("\"$name\"", size = 100)
+        return nb.search("\"$name\"", size = 100, cached = true)
             .filter { wroteBy(it, name) && it.year != null }
             .groupBy { titleKey(it.title) }
             .mapValues { (_, records) -> records.minOf { it.year!! } }
@@ -193,9 +199,9 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         fun sameTitle(r: CatalogRecord) = titleKey(r.title) == wanted || foldText(r.title).startsWith(foldText(book.title))
         val author = TasteProfile.authorNames(book.authors).firstOrNull()
         // An ISBN typed or scanned wrong points at another book; only trust it if the title agrees.
-        val record = book.isbn?.let { nb.findByIsbn(it) }?.takeIf(::sameTitle)
+        val record = book.isbn?.let { nb.findByIsbn(it, cached = true) }?.takeIf(::sameTitle)
             ?: author?.let {
-                nb.search("\"${book.title}\" \"$it\"", size = 10)
+                nb.search("\"${book.title}\" \"$it\"", size = 10, cached = true)
                     // Same author (not a book about it), and the title may carry a subtitle.
                     .firstOrNull { r -> wroteBy(r, it) && sameTitle(r) }
             }
@@ -208,7 +214,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
 
     /** With no author to go by: the book with this exact title, if the catalogue has it by one author only. */
     private suspend fun onlyBookTitled(title: String): CatalogRecord? =
-        nb.search("\"$title\"", size = 20).filter { titleKey(it.title) == titleKey(title) }
+        nb.search("\"$title\"", size = 20, cached = true).filter { titleKey(it.title) == titleKey(title) }
             .takeIf { all -> all.isNotEmpty() && all.mapNotNull { it.creators.firstOrNull() }.distinct().size == 1 }
             ?.first()
 
@@ -231,7 +237,8 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
                 author = record.creators.firstOrNull(),
             )
         } else {
-            nb.details(record.id)
+            // A record's details hardly change, so a search repeated within the week asks again only for new books.
+            nb.details(record.id, cached = true)
         }
 
     fun toCandidate(record: CatalogRecord, details: NbDetails) = Candidate(
@@ -257,6 +264,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
 
         /** Pages of 100 to read per subgenre and year; more than most genres publish in a year. */
         private const val GENRE_PAGES = 4
+        private const val GENRE_BATCH = 10
 
         /** How many new books to read in full (one request each) and score. */
         private const val MAX_DETAILS = 300

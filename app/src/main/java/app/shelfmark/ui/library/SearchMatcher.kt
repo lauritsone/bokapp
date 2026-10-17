@@ -12,11 +12,13 @@ object SearchMatcher {
 
     fun terms(query: String): List<String> = foldText(query).split(' ').filter { it.isNotEmpty() }
 
-    fun matches(book: Book, terms: List<String>): Boolean {
-        if (terms.isEmpty()) return true
-        val text = foldText(
-            listOfNotNull(book.title, book.authors, book.notes, book.isbn, book.publisher, book.series, book.tags, book.lentTo).joinToString(" "),
-        )
-        return terms.all { it in text }
-    }
+    fun matches(book: Book, terms: List<String>): Boolean =
+        terms.isEmpty() || matches(foldText(rawText(book)), terms)
+
+    /** Whether [folded], a book's [rawText] after [foldText], holds every term. */
+    fun matches(folded: String, terms: List<String>): Boolean = terms.all { it in folded }
+
+    /** Everything about a book that a search looks through, before folding. */
+    fun rawText(book: Book): String =
+        listOfNotNull(book.title, book.authors, book.notes, book.isbn, book.publisher, book.series, book.tags, book.lentTo).joinToString(" ")
 }

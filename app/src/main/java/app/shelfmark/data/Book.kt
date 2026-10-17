@@ -2,11 +2,13 @@ package app.shelfmark.data
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import java.io.File
 
-@Entity(tableName = "books")
+// Indexed on ISBN, the lookup behind every scan and import.
+@Entity(tableName = "books", indices = [Index("isbn")])
 data class Book(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val isbn: String? = null,
@@ -113,3 +115,6 @@ fun Book.seriesOrder(): Double = seriesNumber?.replace(',', '.')?.toDoubleOrNull
 
 /** The user's own photo wins over the online cover. */
 fun Book.coverModel(): Any? = photoPath?.let { File(it) } ?: coverUrl
+
+/** The fields of a [Book] that tell two books apart, for duplicate checks. */
+data class BookName(val id: Long, val title: String, val authors: String)

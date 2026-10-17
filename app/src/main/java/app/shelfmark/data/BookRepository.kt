@@ -24,10 +24,11 @@ class BookRepository(
     private val dao: BookDao,
     private val bookLookup: BookLookup,
     private val filesDir: File,
+    cacheDir: File,
 ) {
     val books: Flow<List<Book>> = dao.observeAll()
 
-    private val nb = NbCatalog()
+    private val nb = NbCatalog(DiskCache(File(cacheDir, "catalogue"), maxAgeMs = 7L * 24 * 60 * 60 * 1000))
     private val ol = OlCatalog()
     private val releaseFinder = ReleaseFinder(dao, nb, ol)
     private val coverFinder = CoverFinder(nb)
@@ -65,29 +66,32 @@ class BookRepository(
         }
     }
 
-    private suspend fun repairCoverBatch() = coroutineScope {
-        val pending = dao.getAll().filter {
-            it.photoPath == null && it.coverCheckedAt == 0L && (it.coverUrl == null || CoverFinder.isGuess(it.coverUrl))
-        }
+    private suspend fun repairCoverBatch() {
+        val pending = dao.uncheckedCovers().filter { it.coverUrl == null || CoverFinder.isGuess(it.coverUrl) }
         val permits = Semaphore(4)
-        pending.map { book ->
-            launch {
-                permits.withPermit {
-                    val guess = book.coverUrl
-                    try {
-                        if (guess != null && imageExists(guess)) {
-                            dao.setCover(book.id, guess, System.currentTimeMillis())
-                        } else {
-                            dao.setCover(book.id, coverFinder.find(book), System.currentTimeMillis())
+        // Found covers are saved a batch at a time: each write redraws the library, and an
+        // import can leave hundreds of books to check.
+        for (batch in pending.chunked(COVER_BATCH)) {
+            val found = java.util.concurrent.ConcurrentHashMap<Long, java.util.Optional<String>>()
+            coroutineScope {
+                batch.map { book ->
+                    launch {
+                        permits.withPermit {
+                            val guess = book.coverUrl
+                            try {
+                                val cover = if (guess != null && imageExists(guess)) guess else coverFinder.find(book)
+                                found[book.id] = java.util.Optional.ofNullable(cover)
+                            } catch (e: IOException) {
+                                // Offline: leave it for the next run.
+                            } catch (e: JSONException) {
+                                // An unexpected answer from a cover service: try again next run.
+                            }
                         }
-                    } catch (e: IOException) {
-                        // Offline: leave it for the next run.
-                    } catch (e: JSONException) {
-                        // An unexpected answer from a cover service: try again next run.
                     }
-                }
+                }.joinAll()
             }
-        }.joinAll()
+            if (found.isNotEmpty()) dao.setCovers(found.mapValues { it.value.orElse(null) }, System.currentTimeMillis())
+        }
     }
 
     /** The last search, kept while the app runs so revisiting the page is instant. */
@@ -109,9 +113,10 @@ class BookRepository(
     suspend fun addToWantToRead(match: Match): Long = adding.withLock {
         val c = match.candidate
         addedReleases += c.record.id
-        val existing = c.record.isbn?.let { dao.findByIsbn(it) }
-            ?: dao.getAll().firstOrNull { nameKey(it) == foldText(c.record.title) + "|" + foldText(c.author) }
-        if (existing != null) return existing.id
+        val key = foldText(c.record.title) + "|" + foldText(c.author)
+        val existing = c.record.isbn?.let { dao.findByIsbn(it) }?.id
+            ?: dao.names().firstOrNull { foldText(it.title) + "|" + foldText(it.authors) == key }?.id
+        if (existing != null) return existing
         save(
             Book(
                 title = c.record.title,
@@ -394,7 +399,8 @@ class BookRepository(
         } catch (e: JSONException) {
             null
         } ?: return@withContext null
-        val owned = dao.getAll().firstOrNull { it.id != book.id && ReleaseFinder.titleKey(it.title) == ReleaseFinder.titleKey(next) }
+        val owned = dao.names().firstOrNull { it.id != book.id && ReleaseFinder.titleKey(it.title) == ReleaseFinder.titleKey(next) }
+            ?.let { dao.get(it.id) }
         if (owned != null) return@withContext NextInSeries(next, owned = owned, record = null)
         // The edition to add: the same author's, newest first, Norwegian when there is one.
         val editions = nb.search(listOfNotNull("\"$next\"", author?.let { "\"$it\"" }).joinToString(" "), size = 20, norwegianOnly = false)
@@ -451,25 +457,36 @@ class BookRepository(
      * @throws ImportException if the file can't be read as either format.
      */
     suspend fun import(input: InputStream): ImportResult = withContext(Dispatchers.IO) {
-        val bytes = input.use { it.readBytes() }
-        val backup = if (LibraryBackup.isZip(bytes)) {
-            try {
-                LibraryBackup.read(bytes)
-            } catch (e: java.util.zip.ZipException) {
-                throw ImportException("Not a readable zip file")
+        val (backup, text) = input.buffered().use { stream ->
+            if (LibraryBackup.isZip(stream)) {
+                // Photos go straight to storage as they are read, so a big backup fits in memory.
+                val contents = try {
+                    LibraryBackup.read(stream, ::newPhotoFile)
+                } catch (e: java.util.zip.ZipException) {
+                    throw ImportException("Not a readable zip file")
+                }
+                contents to contents.booksJson
+            } else {
+                null to LibraryImport.decode(stream.readBytes())
             }
-        } else {
-            null
         }
-        val incoming = LibraryImport.parse(backup?.booksJson ?: LibraryImport.decode(bytes))
-            // A photo path only means something inside a backup zip; unpack it to the phone.
-            .map { book -> book.copy(photoPath = book.photoPath?.let { backup?.photos?.get(it) }?.let(::savePhoto)) }
+        val incoming = try {
+            LibraryImport.parse(text)
+                // A photo path only means something inside a backup zip.
+                .map { book -> book.copy(photoPath = book.photoPath?.let { backup?.photos?.get(it) }?.absolutePath) }
+        } catch (e: Exception) {
+            backup?.photos?.values?.forEach { it.delete() }
+            throw e
+        }
+        // Photos in the zip that no book names.
+        val named = incoming.mapNotNull { it.photoPath }.toSet()
+        backup?.photos?.values?.filter { it.absolutePath !in named }?.forEach { it.delete() }
         val existing = dao.getAll()
         val byIsbn = existing.filter { it.isbn != null }.associateBy { it.isbn }.toMutableMap()
         val byName = existing.associateBy(::nameKey).toMutableMap()
         val now = System.currentTimeMillis()
         val fresh = mutableListOf<Book>()
-        var updated = 0
+        val updates = mutableListOf<Book>()
         for (book in incoming) {
             val match = book.isbn?.let { byIsbn[it] } ?: byName[nameKey(book)]
             if (match == null) {
@@ -493,27 +510,30 @@ class BookRepository(
                 book.photoPath?.let { File(it).delete() }
                 continue
             }
-            if (merged.photoPath != match.photoPath) match.photoPath?.let { File(it).delete() }
             if (book.photoPath != null && merged.photoPath != book.photoPath) File(book.photoPath).delete()
-            dao.upsert(merged)
-            updated++
+            updates += merged
             byName[nameKey(merged)] = merged.copy(id = 0)
             merged.isbn?.let { byIsbn[it] = merged.copy(id = 0) }
         }
-        dao.insertAll(fresh)
-        if (fresh.isNotEmpty() || updated > 0) {
+        // One transaction: an import is all or nothing, and the library redraws once.
+        try {
+            dao.upsertAll(updates + fresh)
+        } catch (e: Exception) {
+            // Only the photos this import unpacked; the library's own stay.
+            backup?.photos?.values?.forEach { it.delete() }
+            throw e
+        }
+        // Replaced photos go only once the new ones are safely in.
+        val oldPhotos = existing.associate { it.id to it.photoPath }
+        for (merged in updates) {
+            val old = oldPhotos[merged.id]
+            if (old != null && old != merged.photoPath) File(old).delete()
+        }
+        if (fresh.isNotEmpty() || updates.isNotEmpty()) {
             repairCovers()
             lastReleases = null
         }
-        ImportResult(added = fresh.size, updated = updated, skipped = incoming.size - fresh.size - updated)
-    }
-
-    private fun savePhoto(data: ByteArray): String {
-        val file = newPhotoFile()
-        // Several photos in the same millisecond would share a name.
-        val unique = if (file.exists()) File(file.parentFile, "cover_${System.nanoTime()}.jpg") else file
-        unique.writeBytes(data)
-        return unique.absolutePath
+        ImportResult(added = fresh.size, updated = updates.size, skipped = incoming.size - fresh.size - updates.size)
     }
 
     private fun nameKey(book: Book) = foldText(book.title) + "|" + foldText(book.authors)
@@ -527,9 +547,16 @@ class BookRepository(
     /** A fresh file in app-private storage for a cover photo. */
     fun newPhotoFile(): File {
         val dir = File(filesDir, "covers").apply { mkdirs() }
-        return File(dir, "cover_${System.currentTimeMillis()}.jpg")
+        // An import saves many photos in the same millisecond; each needs its own name.
+        val stamp = System.currentTimeMillis()
+        return generateSequence(0) { it + 1 }
+            .map { n -> File(dir, if (n == 0) "cover_$stamp.jpg" else "cover_${stamp}_$n.jpg") }
+            .first { !it.exists() }
     }
 }
+
+/** How many books' covers are looked for before the ones found are saved. */
+private const val COVER_BATCH = 16
 
 /** The next book in a series: on a shelf already ([owned]), or a catalogue edition to add. */
 data class NextInSeries(val title: String, val owned: Book?, val record: CatalogRecord?)

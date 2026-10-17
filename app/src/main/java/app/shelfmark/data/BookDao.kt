@@ -2,8 +2,8 @@ package app.shelfmark.data
 
 import androidx.room.Dao
 import androidx.room.Delete
-import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -24,11 +24,24 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE isbn = :isbn LIMIT 1")
     suspend fun findByIsbn(isbn: String): Book?
 
-    @Insert
-    suspend fun insertAll(books: List<Book>)
+    /** Just enough of every book to tell whether one is already in the library. */
+    @Query("SELECT id, title, authors FROM books")
+    suspend fun names(): List<BookName>
+
+    /** Books without a photo whose cover hasn't been looked for yet. */
+    @Query("SELECT * FROM books WHERE photoPath IS NULL AND coverCheckedAt = 0")
+    suspend fun uncheckedCovers(): List<Book>
+
+    /** Books in the taste profile whose genres were learned before [since] (or never). */
+    @Query("SELECT * FROM books WHERE ignoreForSuggestions = 0 AND profiledAt < :since LIMIT :limit")
+    suspend fun unprofiled(since: Long, limit: Int): List<Book>
 
     @Upsert
     suspend fun upsert(book: Book): Long
+
+    /** In one transaction: new books (id 0) are added, the others replaced. */
+    @Upsert
+    suspend fun upsertAll(books: List<Book>)
 
     @Query("UPDATE books SET rating = :rating, updatedAt = :now WHERE id = :id")
     suspend fun setRating(id: Long, rating: Int, now: Long)
@@ -54,9 +67,21 @@ interface BookDao {
     @Query("UPDATE books SET genres = :genres, profiledAt = :now WHERE id = :id")
     suspend fun setGenres(id: Long, genres: String?, now: Long)
 
+    /** Several books' genres in one transaction, so the library redraws once. */
+    @Transaction
+    suspend fun setGenres(genres: Map<Long, String?>, now: Long) {
+        for ((id, g) in genres) setGenres(id, g, now)
+    }
+
     /** Sets the cover and marks it as checked. */
     @Query("UPDATE books SET coverUrl = :coverUrl, coverCheckedAt = :now WHERE id = :id")
     suspend fun setCover(id: Long, coverUrl: String?, now: Long)
+
+    /** Several books' covers in one transaction, so the library redraws once. */
+    @Transaction
+    suspend fun setCovers(covers: Map<Long, String?>, now: Long) {
+        for ((id, url) in covers) setCover(id, url, now)
+    }
 
     @Query("UPDATE books SET currentPage = :page, updatedAt = :now WHERE id = :id")
     suspend fun setProgress(id: Long, page: Int?, now: Long)

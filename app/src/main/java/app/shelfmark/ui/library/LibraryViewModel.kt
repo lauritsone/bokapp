@@ -16,7 +16,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -62,7 +65,24 @@ class LibraryViewModel(
     private val shelf = saved.getStateFlow("shelf", Shelf.Read.code)
     private val filter = saved.getStateFlow<String?>("filter", null)
 
-    val state: StateFlow<LibraryState> = combine(repo.books, query, sort, shelf, filter) { all, q, sortName, shelfCode, f ->
+    /**
+     * Each book's search text, folded, by the text before folding. Folding (accents, case) is
+     * the slow part of a search, and between keystrokes the books rarely change.
+     */
+    private var foldedText: Map<String, String> = emptyMap()
+
+    private fun foldedTexts(all: List<Book>): List<String> {
+        val previous = foldedText
+        val next = HashMap<String, String>(all.size * 2)
+        val texts = all.map { book ->
+            val raw = SearchMatcher.rawText(book)
+            next[raw] ?: (previous[raw] ?: foldText(raw)).also { next[raw] = it }
+        }
+        foldedText = next
+        return texts
+    }
+
+    val state: StateFlow<LibraryState> = combine(repo.books.conflate(), query, sort, shelf, filter) { all, q, sortName, shelfCode, f ->
         val s = SortMode.entries.firstOrNull { it.name == sortName } ?: SortMode.Recent
         val sh = Shelf.fromCode(shelfCode)
         // A search or filter looks through every shelf; otherwise show the selected shelf.
@@ -77,14 +97,15 @@ class LibraryViewModel(
             tagKey != null -> f.takeIf { tags.any { foldText(it) == tagKey } }
             else -> null
         }
-        val filtered = all.filter { book ->
+        val texts = if (terms.isEmpty()) null else foldedTexts(all)
+        val filtered = all.filterIndexed { i, book ->
             when {
                 active == LENT_FILTER -> book.lentTo != null
                 active != null -> book.tagList().any { foldText(it) == tagKey }
                 tagKey != null -> book.tagList().any { foldText(it) == tagKey }
                 terms.isEmpty() -> book.shelf == sh
                 else -> true
-            } && SearchMatcher.matches(book, terms)
+            } && (texts == null || SearchMatcher.matches(texts[i], terms))
         }
         val sorted = when (s) {
             SortMode.Recent -> filtered.sortedByDescending { it.addedAt }
@@ -116,7 +137,10 @@ class LibraryViewModel(
             lentCount = all.count { it.lentTo != null },
             filter = active,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
+    }
+        // Sorting and searching a large library is kept off the thread that draws the screen.
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
 
     fun setQuery(q: String) {
         saved["query"] = q

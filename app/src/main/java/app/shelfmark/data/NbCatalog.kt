@@ -52,11 +52,21 @@ data class NbDetails(
             .map { personName(it.removeSuffix("(fiktiv person)").trim()) }.distinct().singleOrNull()
 }
 
-/** Client for the parts of api.nb.no that Shelfmark uses. No API key needed. */
-class NbCatalog {
+/**
+ * Client for the parts of api.nb.no that Shelfmark uses. No API key needed. Calls marked
+ * `cached` may be answered from [cache], for lookups whose answers hardly change.
+ */
+class NbCatalog(private val cache: DiskCache? = null) {
 
     /** Books matching [query] (NB search syntax), optionally limited to one year and Bokmål. */
-    suspend fun search(query: String, year: Int? = null, size: Int = 40, norwegianOnly: Boolean = true, page: Int = 0): List<CatalogRecord> =
+    suspend fun search(
+        query: String,
+        year: Int? = null,
+        size: Int = 40,
+        norwegianOnly: Boolean = true,
+        page: Int = 0,
+        cached: Boolean = false,
+    ): List<CatalogRecord> =
         withContext(Dispatchers.IO) {
             val params = buildList {
                 add("q=" + enc(query))
@@ -66,14 +76,30 @@ class NbCatalog {
                 add("size=$size")
                 if (page > 0) add("page=$page")
             }
-            parseSearch(httpGet("$BASE/items?" + params.joinToString("&")))
+            fetch("$BASE/items?" + params.joinToString("&"), cached, ::parseSearch)
         }
 
-    suspend fun findByIsbn(isbn: String): CatalogRecord? =
-        search("isbn:$isbn", size = 5, norwegianOnly = false).firstOrNull { it.isbn == isbn }
+    suspend fun findByIsbn(isbn: String, cached: Boolean = false): CatalogRecord? =
+        search("isbn:$isbn", size = 5, norwegianOnly = false, cached = cached).firstOrNull { it.isbn == isbn }
 
-    suspend fun details(id: String): NbDetails = withContext(Dispatchers.IO) {
-        parseMods(httpGet("$BASE/metadata/$id/mods"))
+    suspend fun details(id: String, cached: Boolean = false): NbDetails = withContext(Dispatchers.IO) {
+        fetch("$BASE/metadata/$id/mods", cached, ::parseMods)
+    }
+
+    /** Old cached answers are deleted. */
+    fun pruneCache() {
+        cache?.prune()
+    }
+
+    private fun <T> fetch(url: String, cached: Boolean, parse: (String) -> T): T {
+        val text = if (cached && cache != null) cache.get(url) else httpGet(url)
+        return try {
+            parse(text)
+        } catch (e: Exception) {
+            // An odd answer isn't kept, so the next try asks again.
+            cache?.forget(url)
+            throw e
+        }
     }
 
     companion object {

@@ -6,7 +6,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Book::class], version = 7, exportSchema = false)
+@Database(entities = [Book::class], version = 8, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
@@ -60,6 +60,13 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE books ADD COLUMN lentTo TEXT")
                 db.execSQL("ALTER TABLE books ADD COLUMN lentAt INTEGER")
                 db.execSQL("ALTER TABLE books ADD COLUMN tags TEXT")
+            }
+        }
+
+        /** An index on ISBN, the lookup behind every scan and import. */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_books_isbn ON books (isbn)")
             }
         }
     }

@@ -145,13 +145,16 @@ class LibraryImportTest {
         val out = ByteArrayOutputStream()
         LibraryExport.write(ExportFormat.Backup, withPhoto, out)
         val bytes = out.toByteArray()
-        assertTrue(LibraryBackup.isZip(bytes))
-        val contents = LibraryBackup.read(bytes)
+        val input = java.io.BufferedInputStream(bytes.inputStream())
+        assertTrue(LibraryBackup.isZip(input))
+        val contents = LibraryBackup.read(input) { java.io.File.createTempFile("restored", ".jpg") }
         val parsed = LibraryImport.parse(contents.booksJson)
         assertSameBooks(parsed)
         assertEquals("crime", parsed[0].genres)
-        assertEquals(listOf(1.toByte(), 2, 3), contents.photos[parsed[0].photoPath]!!.toList())
+        assertEquals(listOf(1.toByte(), 2, 3), contents.photos[parsed[0].photoPath]!!.readBytes().toList())
         assertNull(parsed[1].photoPath)
+        assertTrue(!LibraryBackup.isZip(java.io.BufferedInputStream("title\n".byteInputStream())))
+        contents.photos.values.forEach { it.delete() }
         photo.delete()
     }
 
