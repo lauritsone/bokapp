@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.shelfmark.ui.theme.LocalStarColor
@@ -44,7 +45,8 @@ fun RatingBar(
     val a11y = if (onRatingChange == null) {
         Modifier.semantics(mergeDescendants = true) { contentDescription = ratedDescription }
     } else {
-        Modifier
+        // TalkBack reads the current rating along with each star's action.
+        Modifier.semantics { stateDescription = ratedDescription }
     }
     Row(modifier.then(a11y), horizontalArrangement = Arrangement.spacedBy(spacing)) {
         for (i in 1..5) {

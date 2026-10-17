@@ -140,7 +140,10 @@ class NbCatalog {
 
         private fun unescape(s: String) = s
             .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'")
-            .replace(Regex("&#(\\d+);")) { it.groupValues[1].toInt().toChar().toString() }
+            .replace(Regex("&#([xX][0-9a-fA-F]+|\\d+);")) { m ->
+                val code = m.groupValues[1].let { if (it[0] == 'x' || it[0] == 'X') it.drop(1).toIntOrNull(16) else it.toIntOrNull() }
+                code?.takeIf(Character::isValidCodePoint)?.let { String(Character.toChars(it)) } ?: m.value
+            }
             .replace("&amp;", "&")
     }
 }

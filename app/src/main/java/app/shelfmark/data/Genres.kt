@@ -11,6 +11,12 @@ object Genres {
     /** When the tagging rules last changed; books tagged before this are tagged again. */
     const val RULES_SINCE = 1_792_238_400_000L // 2026-10-17 12:00 UTC
 
+    /**
+     * The time to stamp a freshly tagged book with. Never before [RULES_SINCE], so a phone
+     * whose clock is behind doesn't tag the same books again on every visit.
+     */
+    fun profiledNow() = maxOf(System.currentTimeMillis(), RULES_SINCE)
+
     /** Tag to the word stems (folded) that signal it. A genre may hit several. */
     private val stems = linkedMapOf(
         "crime" to listOf("krim", "crime", "detective", "detektiv", "mystery", "mysteries", "thriller", "spenning", "politiroman"),

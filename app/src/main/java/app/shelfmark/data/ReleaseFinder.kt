@@ -5,6 +5,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlin.coroutines.cancellation.CancellationException
 import java.io.IOException
 import org.json.JSONException
 import java.time.LocalDate
@@ -84,17 +85,26 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
             } catch (e: IOException) {
                 failures.incrementAndGet()
                 emptyList()
-            } catch (e: JSONException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // An unexpected answer (bad JSON, an odd value) shouldn't sink the whole search.
                 emptyList()
             }
         }.flatten()
         if (failures.get() == searches.size) throw IOException("The library catalogue couldn't be reached")
 
-        val owned = library.mapNotNull { it.isbn }.toSet()
-        val ownedTitles = library.map { titleKey(it.title) }.toSet()
+        val owned = library.mapNotNull { it.isbn?.let { isbn -> Isbn.normalize(isbn) ?: isbn } }.toSet()
+        // Another author's book can share a title with one in the library ("Hjem").
+        val ownedTitles = library.groupBy({ titleKey(it.title) }, { TasteProfile.authorNames(it.authors).firstOrNull() })
+        fun inLibrary(r: CatalogRecord): Boolean {
+            if (r.isbn != null && (Isbn.normalize(r.isbn) ?: r.isbn) in owned) return true
+            val authors = ownedTitles[titleKey(r.title)] ?: return false
+            return authors.any { it == null || r.creators.isEmpty() || wroteBy(r, it) }
+        }
         val authors = profile.favouriteAuthors(limit = 8)
         val fresh = found
-            .filter { it.isbn !in owned && titleKey(it.title) !in ownedTitles }
+            .filterNot(::inLibrary)
             // The same book is often catalogued again a year later; keep the first.
             .sortedWith(compareBy({ it.year ?: Int.MAX_VALUE }, { -it.indexedAt }))
             .distinctBy { titleKey(it.title) + "|" + it.creators.firstOrNull()?.let(::foldText) + "|" + it.language }
@@ -102,24 +112,34 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
             .sortedWith(compareBy({ r -> authors.none { wroteBy(r, it) } }, { -(it.year ?: 0) }, { -it.indexedAt }))
             .take(MAX_DETAILS)
         val done = AtomicInteger()
+        val unreachable = AtomicInteger()
         onProgress(ReleaseProgress.ReadingDetails(0, fresh.size))
         val candidates = concurrently(fresh) { record ->
             val details = try {
                 cachedDetails(record)
             } catch (e: IOException) {
+                unreachable.incrementAndGet()
                 null
-            } catch (e: JSONException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 null
             }
             onProgress(ReleaseProgress.ReadingDetails(done.incrementAndGet(), fresh.size))
             details?.let { toCandidate(record, it) }
         }.filterNotNull()
+            // Editions that list a translator or illustrator first only show as one book once read.
+            .distinctBy { titleKey(it.record.title) + "|" + foldText(it.author) + "|" + it.record.language }
+        // The connection dropped part way: an almost empty list would look like "nothing new".
+        if (fresh.isNotEmpty() && unreachable.get() * 2 > fresh.size) throw IOException("The library catalogue stopped answering")
 
         // New editions of old books ("Rødstrupe", 2026) aren't new releases; each author's
         // bibliography shows which titles they published before.
         // A book outside the subgenres the user reads is no match, however new or well reviewed.
         val scored = candidates.filter(profile::fitsGenres).map(profile::score).sortedByDescending { it.percent }
-        val matches = concurrently(scored) { match -> match.takeUnless { isReissue(it.candidate, year) } }.filterNotNull()
+        // Checking takes a request per author, so only the books that may be shown are checked.
+        val shortlist = scored.filter { it.percent >= MIN_PERCENT }.takeIf { it.size >= 10 } ?: scored.take(20)
+        val matches = concurrently(shortlist) { match -> match.takeUnless { isReissue(it.candidate, year) } }.filterNotNull()
             // Poor matches only clutter the list, but a thin library should still see something.
             .let { all -> all.filter { it.percent >= MIN_PERCENT }.takeIf { it.size >= 10 } ?: all.take(10) }
         return ReleaseResult(matches, profile.bookCount, library.count { it.ignoreForSuggestions })
@@ -134,7 +154,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         concurrently(pending) { book ->
             try {
                 val tags = genresFor(book)
-                dao.setGenres(book.id, tags.takeIf { it.isNotEmpty() }?.let(Genres::encode), System.currentTimeMillis())
+                dao.setGenres(book.id, tags.takeIf { it.isNotEmpty() }?.let(Genres::encode), Genres.profiledNow())
             } catch (e: IOException) {
                 // Offline or catalogue hiccup: try this book again next time.
             } catch (e: JSONException) {

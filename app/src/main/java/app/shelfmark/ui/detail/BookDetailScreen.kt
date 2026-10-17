@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -98,6 +99,7 @@ fun BookDetailScreen(
     val refreshResult by vm.refreshResult.collectAsStateWithLifecycle()
     val offline by vm.offline.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val missing by vm.missing.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(refreshResult, offline) {
@@ -156,7 +158,14 @@ fun BookDetailScreen(
     ) { padding ->
         val current = book
         if (current == null) {
-            Box(Modifier.fillMaxSize().padding(padding))
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                // Briefly while loading; for good if the book was removed meanwhile.
+                if (missing) {
+                    Text(stringResource(R.string.book_not_found), style = MaterialTheme.typography.bodyLarge)
+                } else {
+                    CircularProgressIndicator()
+                }
+            }
         } else {
             DetailContent(
                 book = current,
@@ -167,7 +176,7 @@ fun BookDetailScreen(
                 onUseForSuggestions = vm::setUseForSuggestions,
                 onFindDetails = vm::refresh,
                 refreshing = refreshing,
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.padding(padding).consumeWindowInsets(padding),
             )
         }
     }

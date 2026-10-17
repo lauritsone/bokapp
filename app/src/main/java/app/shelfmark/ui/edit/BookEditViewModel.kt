@@ -1,5 +1,6 @@
 package app.shelfmark.ui.edit
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.Book
@@ -45,6 +46,7 @@ class BookEditViewModel(
     isbn: String?,
     photoPath: String?,
     shelf: Shelf,
+    private val saved: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditState(book = Book(isbn = isbn, photoPath = photoPath, shelf = shelf)))
@@ -52,10 +54,22 @@ class BookEditViewModel(
 
     init {
         viewModelScope.launch {
+            val draft = saved.get<HashMap<String, String>>(DRAFT)
             when {
-                bookId != 0L -> repo.get(bookId)?.let { existing -> _state.update { it.copy(book = existing) } }
+                // Back after Android closed the app in the background: the form as the user left it.
+                draft != null -> {
+                    val base = if (bookId != 0L) repo.get(bookId) ?: Book(id = bookId) else _state.value.book
+                    _state.update { it.copy(book = base.withDraft(draft)) }
+                }
+                bookId != 0L -> {
+                    // The form stays hidden until the book is loaded, so nothing typed is overwritten.
+                    _state.update { it.copy(loading = true) }
+                    val existing = repo.get(bookId)
+                    _state.update { s -> s.copy(loading = false, book = existing ?: s.book) }
+                }
                 isbn != null -> fetch(isbn)
             }
+            _state.collect { saved[DRAFT] = it.book.toDraft() }
         }
     }
 
@@ -131,6 +145,9 @@ class BookEditViewModel(
 
     fun closeResults() = _state.update { it.copy(results = null) }
 
+    /** Back to the form from "already in your library", to correct the ISBN. */
+    fun dismissDuplicate() = _state.update { it.copy(duplicateOf = null) }
+
     /** Fills the form from an edition picked among the search results. */
     fun pick(record: CatalogRecord) {
         _state.update { it.copy(results = null, loading = true, message = null) }
@@ -194,9 +211,32 @@ class BookEditViewModel(
                 ),
             )
             savedPhoto = true
-            _state.update { it.copy(saving = false, savedId = id) }
+            // Stays "saving" so a second tap during the exit can't add the book twice.
+            _state.update { it.copy(book = it.book.copy(id = id), savedId = id) }
         }
     }
+
+    private fun Book.toDraft() = hashMapOf(
+        "title" to title, "authors" to authors, "isbn" to isbn.orEmpty(), "publisher" to publisher.orEmpty(),
+        "publishedDate" to publishedDate.orEmpty(), "pageCount" to (pageCount?.toString() ?: ""),
+        "description" to description.orEmpty(), "notes" to notes, "rating" to rating.toString(),
+        "shelf" to shelf.code.toString(), "coverUrl" to coverUrl.orEmpty(), "photoPath" to photoPath.orEmpty(),
+    )
+
+    private fun Book.withDraft(d: Map<String, String>) = copy(
+        title = d["title"] ?: title,
+        authors = d["authors"] ?: authors,
+        isbn = d["isbn"]?.ifEmpty { null },
+        publisher = d["publisher"]?.ifEmpty { null },
+        publishedDate = d["publishedDate"]?.ifEmpty { null },
+        pageCount = d["pageCount"]?.toIntOrNull(),
+        description = d["description"]?.ifEmpty { null },
+        notes = d["notes"] ?: notes,
+        rating = d["rating"]?.toIntOrNull() ?: rating,
+        shelf = d["shelf"]?.toIntOrNull()?.let(Shelf::fromCode) ?: shelf,
+        coverUrl = d["coverUrl"]?.ifEmpty { null },
+        photoPath = d["photoPath"]?.ifEmpty { null },
+    )
 
     // A cover photo taken for a new book that is never saved would stay in storage.
     private val newPhoto = photoPath.takeIf { bookId == 0L }
@@ -205,5 +245,9 @@ class BookEditViewModel(
     override fun onCleared() {
         val photo = newPhoto ?: return
         if (!savedPhoto && _state.value.book.photoPath == photo) java.io.File(photo).delete()
+    }
+
+    private companion object {
+        const val DRAFT = "draft"
     }
 }

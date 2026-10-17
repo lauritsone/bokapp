@@ -76,6 +76,13 @@ class LibraryImportTest {
         assertEquals(java.time.LocalDate.of(2025, 2, 1), localDay(book.finishedAt!!))
     }
 
+    @Test fun readsYearsAndEpochSecondsAsDates() {
+        val csv = "title;added;finished\r\nSult;1700000000;2023\r\n"
+        val book = LibraryImport.parse(csv).single()
+        assertEquals(1_700_000_000_000, book.addedAt)
+        assertEquals(java.time.LocalDate.of(2023, 1, 1), localDay(book.finishedAt!!))
+    }
+
     @Test fun readsSemicolonCsvWithNorwegianHeaders() {
         val csv = "Tittel;Forfatter;Hylle;Karakter\r\nSult;Knut Hamsun;Vil lese;\r\nMarkens grøde;Knut Hamsun;Lest;5\r\n"
         val books = LibraryImport.parse(csv)

@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -51,6 +52,14 @@ private object Routes {
 
 private val shelfArgument = navArgument("shelf") { type = NavType.IntType; defaultValue = Shelf.Read.code }
 
+/**
+ * Runs [block] only while this screen is the one showing, so a double tap can't navigate
+ * twice (popping past the library to a blank screen, or opening a screen twice).
+ */
+private fun NavBackStackEntry.once(block: () -> Unit) {
+    if (lifecycle.currentState == Lifecycle.State.RESUMED) block()
+}
+
 private fun NavBackStackEntry.shelf() = Shelf.fromCode(arguments?.getInt("shelf") ?: Shelf.Read.code)
 
 @Composable
@@ -58,29 +67,34 @@ private fun ShelfmarkNavHost() {
     val nav = rememberNavController()
 
     NavHost(navController = nav, startDestination = Routes.LIBRARY) {
-        composable(Routes.LIBRARY) {
+        composable(Routes.LIBRARY) { entry ->
             LibraryScreen(
-                onScan = { shelf -> nav.navigate(Routes.scan(shelf)) },
-                onAddByHand = { shelf -> nav.navigate(Routes.newByHand(shelf)) },
-                onOpen = { id -> nav.navigate(Routes.detail(id)) },
-                onReleases = { nav.navigate(Routes.RELEASES) },
+                onScan = { shelf -> entry.once { nav.navigate(Routes.scan(shelf)) } },
+                onAddByHand = { shelf -> entry.once { nav.navigate(Routes.newByHand(shelf)) } },
+                onOpen = { id -> entry.once { nav.navigate(Routes.detail(id)) } },
+                onReleases = { entry.once { nav.navigate(Routes.RELEASES) } },
             )
         }
 
-        composable(Routes.RELEASES) {
-            ReleasesScreen(onBack = { nav.popBackStack() })
+        composable(Routes.RELEASES) { entry ->
+            ReleasesScreen(onBack = { entry.once { nav.popBackStack() } })
         }
 
         composable(Routes.SCAN, arguments = listOf(shelfArgument)) { entry ->
             val shelf = entry.shelf()
             ScanScreen(
-                onBack = { nav.popBackStack() },
+                onBack = { entry.once { nav.popBackStack() } },
                 // Replace the scanner with the new-book screen, so Back returns to the library.
                 onIsbn = { isbn ->
-                    nav.navigate(Routes.newFromIsbn(isbn, shelf)) { popUpTo(Routes.SCAN) { inclusive = true } }
+                    entry.once { nav.navigate(Routes.newFromIsbn(isbn, shelf)) { popUpTo(Routes.SCAN) { inclusive = true } } }
                 },
                 onPhoto = { path ->
-                    nav.navigate(Routes.newFromPhoto(path, shelf)) { popUpTo(Routes.SCAN) { inclusive = true } }
+                    // A photo finishing after the user left the scanner is dropped (its file too).
+                    if (entry.lifecycle.currentState == Lifecycle.State.RESUMED) {
+                        nav.navigate(Routes.newFromPhoto(path, shelf)) { popUpTo(Routes.SCAN) { inclusive = true } }
+                    } else {
+                        java.io.File(path).delete()
+                    }
                 },
             )
         }
@@ -92,8 +106,8 @@ private fun ShelfmarkNavHost() {
             val id = entry.arguments?.getLong("id") ?: 0L
             BookDetailScreen(
                 bookId = id,
-                onBack = { nav.popBackStack() },
-                onEdit = { nav.navigate(Routes.editExisting(id)) },
+                onBack = { entry.once { nav.popBackStack() } },
+                onEdit = { entry.once { nav.navigate(Routes.editExisting(id)) } },
             )
         }
 
@@ -113,7 +127,8 @@ private fun ShelfmarkNavHost() {
                 isbn = args?.getString("isbn"),
                 photoPath = args?.getString("photo"),
                 shelf = entry.shelf(),
-                onBack = { nav.popBackStack() },
+                onBack = { entry.once { nav.popBackStack() } },
+                // Sent once by the screen after saving, not by a tap, so it isn't guarded.
                 onSaved = { savedId ->
                     if (id == 0L) {
                         nav.navigate(Routes.detail(savedId)) { popUpTo(Routes.LIBRARY) }
@@ -122,7 +137,7 @@ private fun ShelfmarkNavHost() {
                     }
                 },
                 onOpenExisting = { existingId ->
-                    nav.navigate(Routes.detail(existingId)) { popUpTo(Routes.LIBRARY) }
+                    entry.once { nav.navigate(Routes.detail(existingId)) { popUpTo(Routes.LIBRARY) } }
                 },
             )
         }

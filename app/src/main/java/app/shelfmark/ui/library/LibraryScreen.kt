@@ -27,6 +27,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.SnackbarHostState
@@ -62,7 +64,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
@@ -259,6 +263,7 @@ private fun summaryLine(s: LibraryState): String {
 
 @Composable
 private fun SearchField(query: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val focusManager = LocalFocusManager.current
     val container = MaterialTheme.colorScheme.surfaceContainerHigh
     TextField(
         value = query,
@@ -277,6 +282,8 @@ private fun SearchField(query: String, onChange: (String) -> Unit, modifier: Mod
         textStyle = MaterialTheme.typography.bodyLarge,
         shape = RoundedCornerShape(16.dp),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        // The list filters as you type; the Search key just puts the keyboard away.
+        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
         colors = TextFieldDefaults.colors(
             focusedContainerColor = container,
             unfocusedContainerColor = container,
@@ -507,7 +514,8 @@ private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState):
         scope.launch {
             val message = try {
                 val out = context.contentResolver.openOutputStream(uri) ?: throw IOException("No output stream")
-                val count = repo.export(format, out)
+                // Finishes even if the screen goes away (rotation, opening a book) part way.
+                val count = withContext(NonCancellable) { repo.export(format, out) }
                 context.resources.getQuantityString(R.plurals.export_done, count, count)
             } catch (e: IOException) {
                 context.getString(R.string.export_failed)
@@ -546,7 +554,7 @@ private fun rememberImporter(repo: BookRepository, snackbar: SnackbarHostState):
             val res = context.resources
             val message = try {
                 val input = context.contentResolver.openInputStream(uri) ?: throw IOException("No input stream")
-                val result = repo.import(input)
+                val result = withContext(NonCancellable) { repo.import(input) }
                 when {
                     result.added == 0 && result.skipped == 0 -> res.getString(R.string.import_nothing)
                     result.skipped == 0 -> res.getQuantityString(R.plurals.import_done, result.added, result.added)

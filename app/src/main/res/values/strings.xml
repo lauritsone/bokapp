@@ -227,4 +227,6 @@
     <string name="refresh_not_found">Couldn’t find this book in the catalogues. Edit it to search by title, or check the spelling.</string>
     <string name="refresh_ambiguous">Several authors have a book with this title. Edit it to pick the right one.</string>
     <string name="refresh_offline">No connection to the book databases. Try again later.</string>
+    <string name="back_to_form">Back to the form</string>
+    <string name="book_not_found">This book is no longer in your library.</string>
 </resources>

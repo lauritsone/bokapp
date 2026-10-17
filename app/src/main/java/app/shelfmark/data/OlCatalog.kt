@@ -57,7 +57,7 @@ class OlCatalog {
                 val w = docs.getJSONObject(i)
                 // The search asks for language:eng, so the matching edition is the English one.
                 val e = w.optJSONObject("editions")?.optJSONArray("docs")?.optJSONObject(0)
-                val title = (e?.optString("title") ?: w.optString("title")).trim().ifEmpty { null } ?: return@mapNotNull null
+                val title = (e?.optString("title")?.trim()?.ifEmpty { null } ?: w.optString("title").trim()).ifEmpty { null } ?: return@mapNotNull null
                 val isbns = e?.optJSONArray("isbn").strings()
                 val coverId = e?.optInt("cover_i")?.takeIf { it > 0 } ?: w.optInt("cover_i").takeIf { it > 0 }
                 CatalogRecord(

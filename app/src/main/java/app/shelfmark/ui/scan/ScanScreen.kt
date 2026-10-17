@@ -5,6 +5,8 @@ import app.shelfmark.R
 import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -31,6 +33,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -134,9 +137,13 @@ fun ScanScreen(
             .background(Color.Black),
     ) {
         when {
-            hasPermission -> CameraScanner(onIsbn = onIsbn, onPhoto = onPhoto)
+            // The dialog's ISBN and a barcode seen behind it would both open a new book.
+            hasPermission -> CameraScanner(onIsbn = onIsbn, onPhoto = onPhoto, paused = showIsbnDialog)
             asked -> PermissionNeeded(
-                onAllow = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                // After "Don't ask again" Android no longer shows the question: settings is the only way.
+                onAllow = permissionLauncher.takeIf {
+                    context.activity()?.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) == true
+                }?.let { launcher -> { launcher.launch(Manifest.permission.CAMERA) } },
                 onOpenSettings = {
                     context.startActivity(
                         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
@@ -176,7 +183,7 @@ fun ScanScreen(
 }
 
 @Composable
-private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit) {
+private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit, paused: Boolean) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptics = LocalHapticFeedback.current
@@ -228,10 +235,8 @@ private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit) {
             executor.shutdown()
         }
     }
-    LaunchedEffect(mode) {
-        analyzer.active = mode == ScanMode.Barcode
-        error = null
-    }
+    LaunchedEffect(mode) { error = null }
+    LaunchedEffect(mode, paused) { analyzer.active = mode == ScanMode.Barcode && !paused }
 
     fun takePhoto() {
         capturing = true
@@ -288,7 +293,8 @@ private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit) {
                 }
             }
             Spacer(Modifier.height(20.dp))
-            ModeSwitch(mode, onChange = { mode = it })
+            // Switching while a photo is being saved would leave it to arrive in the wrong mode.
+            ModeSwitch(mode, onChange = { if (!capturing) mode = it })
         }
     }
 }
@@ -371,7 +377,7 @@ private fun ModeSwitch(mode: ScanMode, onChange: (ScanMode) -> Unit) {
                 Modifier
                     .clip(CircleShape)
                     .background(if (selected) Color.White else Color.Transparent)
-                    .clickable(role = Role.Tab, onClick = { onChange(m) })
+                    .selectable(selected = selected, role = Role.Tab, onClick = { onChange(m) })
                     .padding(horizontal = 18.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -384,7 +390,7 @@ private fun ModeSwitch(mode: ScanMode, onChange: (ScanMode) -> Unit) {
 }
 
 @Composable
-private fun PermissionNeeded(onAllow: () -> Unit, onOpenSettings: () -> Unit, onTypeIsbn: () -> Unit) {
+private fun PermissionNeeded(onAllow: (() -> Unit)?, onOpenSettings: () -> Unit, onTypeIsbn: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
@@ -409,12 +415,18 @@ private fun PermissionNeeded(onAllow: () -> Unit, onOpenSettings: () -> Unit, on
             modifier = Modifier.widthIn(max = 360.dp),
         )
         Spacer(Modifier.height(28.dp))
-        Button(
-            onClick = onAllow,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-        ) { Text(stringResource(R.string.allow_camera), style = MaterialTheme.typography.labelLarge) }
-        TextButton(onClick = onOpenSettings) {
-            Text(stringResource(R.string.open_settings), color = Color.White, style = MaterialTheme.typography.labelLarge)
+        val white = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+        if (onAllow != null) {
+            Button(onClick = onAllow, colors = white) {
+                Text(stringResource(R.string.allow_camera), style = MaterialTheme.typography.labelLarge)
+            }
+            TextButton(onClick = onOpenSettings) {
+                Text(stringResource(R.string.open_settings), color = Color.White, style = MaterialTheme.typography.labelLarge)
+            }
+        } else {
+            Button(onClick = onOpenSettings, colors = white) {
+                Text(stringResource(R.string.open_settings), style = MaterialTheme.typography.labelLarge)
+            }
         }
         TextButton(onClick = onTypeIsbn) {
             Text(stringResource(R.string.type_isbn_instead), color = Color.White, style = MaterialTheme.typography.labelLarge)
@@ -436,3 +448,6 @@ private fun LightStatusBarIcons() {
         }
     }
 }
+
+private fun Context.activity(): Activity? =
+    generateSequence(this) { (it as? ContextWrapper)?.baseContext }.filterIsInstance<Activity>().firstOrNull()

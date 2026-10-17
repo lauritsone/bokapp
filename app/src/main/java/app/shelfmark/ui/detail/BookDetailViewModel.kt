@@ -9,6 +9,7 @@ import app.shelfmark.data.Shelf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -21,6 +22,10 @@ class BookDetailViewModel(
 
     val book: StateFlow<Book?> = repo.observe(id)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** True once it's known there is no such book (removed elsewhere), as opposed to still loading. */
+    val missing: StateFlow<Boolean> = repo.observe(id).map { it == null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun setRating(rating: Int) {
         viewModelScope.launch { repo.setRating(id, rating) }

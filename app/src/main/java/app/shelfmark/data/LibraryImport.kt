@@ -197,7 +197,14 @@ object LibraryImport {
      */
     private fun parseTime(raw: String?): Long? {
         val value = raw?.trim()?.ifEmpty { null } ?: return null
-        value.toLongOrNull()?.let { return it }
+        value.toLongOrNull()?.let { n ->
+            return when {
+                n > 100_000_000_000 -> n // epoch milliseconds (from 1973 on)
+                n > 1_000_000_000 -> n * 1000 // epoch seconds, as other apps export
+                n in 1000..9999 -> LocalDate.of(n.toInt(), 1, 1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                else -> null
+            }
+        }
         try {
             return Instant.parse(value).toEpochMilli()
         } catch (_: DateTimeParseException) {

@@ -16,15 +16,18 @@ import java.net.URLEncoder
  */
 class CoverFinder(private val nb: NbCatalog) {
 
-    /** @throws IOException if no source could be reached, so the book is tried again later. */
+    /**
+     * @throws IOException if a source couldn't be reached and none had a cover, so the book
+     * is tried again later instead of being marked as having none.
+     */
     suspend fun find(book: Book): String? = withContext(Dispatchers.IO) {
-        var reached = false
+        var failed = false
         suspend fun attempt(block: suspend () -> String?): String? = try {
-            block().also { reached = true }
+            block()
         } catch (e: IOException) {
+            failed = true
             null
         } catch (e: JSONException) {
-            reached = true
             null
         }
 
@@ -42,7 +45,7 @@ class CoverFinder(private val nb: NbCatalog) {
         } else {
             null
         }
-        if (found == null && !reached) throw IOException("No cover source could be reached")
+        if (found == null && failed) throw IOException("A cover source couldn't be reached")
         found
     }
 

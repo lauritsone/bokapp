@@ -74,11 +74,12 @@ class TasteProfile(books: List<Book>) {
                 when {
                     Genres.isGenre(tag) -> {
                         genreWeights.add(tag, w)
-                        genreCounts[tag] = (genreCounts[tag] ?: 0) + 1
+                        // "Crime · 7 books" means books the user liked, not ones they disliked.
+                        if (w > 0) genreCounts[tag] = (genreCounts[tag] ?: 0) + 1
                     }
                     tag.startsWith(Genres.TOPIC) || tag.startsWith(Genres.SERIES) -> {
                         topicWeights.add(tag, w)
-                        topicCounts[tag] = (topicCounts[tag] ?: 0) + 1
+                        if (w > 0) topicCounts[tag] = (topicCounts[tag] ?: 0) + 1
                     }
                     // What the user doesn't like says little about mood or origin; only liked books count.
                     w > 0 && tag.startsWith(Genres.TONE) -> toneWeights.add(tag, w)
@@ -259,7 +260,10 @@ class TasteProfile(books: List<Book>) {
                 else -> 1.0
             }
             book.shelf == Shelf.Reading -> 0.6
-            else -> 0.5
+            book.shelf == Shelf.Read -> 0.5
+            // Only meant to be read: a hint of interest, too weak to make the author a favourite
+            // (adding a suggestion would otherwise steer the next suggestions to that author).
+            else -> 0.15
         }
 
         fun authorNames(authors: String): List<String> =

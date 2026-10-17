@@ -217,4 +217,11 @@ class ReleaseMatchingTest {
         assertFalse("Hellstrøm" in profile.favouriteAuthors(10))
         assertEquals("crime", profile.topGenres(3).first())
     }
+
+    @Test fun wantToReadDoesNotMakeAFavouriteAuthor() {
+        val wanted = Book(title = "Ny bok", authors = "Ny Forfatter", shelf = Shelf.WantToRead, genres = "crime")
+        assertFalse("Ny Forfatter" in TasteProfile(listOf(wanted)).favouriteAuthors(10))
+        val read = wanted.copy(shelf = Shelf.Read)
+        assertTrue("Ny Forfatter" in TasteProfile(listOf(read)).favouriteAuthors(10))
+    }
 }

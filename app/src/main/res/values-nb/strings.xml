@@ -222,4 +222,6 @@
     <string name="refresh_not_found">Fant ikke boka i katalogene. Rediger den for å søke på tittel, eller sjekk stavemåten.</string>
     <string name="refresh_ambiguous">Flere forfattere har en bok med denne tittelen. Rediger den for å velge riktig.</string>
     <string name="refresh_offline">Får ikke kontakt med bokdatabasene. Prøv igjen senere.</string>
+    <string name="back_to_form">Tilbake til skjemaet</string>
+    <string name="book_not_found">Denne boka er ikke lenger i biblioteket ditt.</string>
 </resources>

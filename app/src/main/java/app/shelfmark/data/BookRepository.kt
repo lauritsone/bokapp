@@ -12,6 +12,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -32,7 +33,11 @@ class BookRepository(
     private val coverFinder = CoverFinder(nb)
 
     /** Work that should finish even if the user leaves the screen that started it. */
-    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val background = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO +
+            // A failed background job (a database or parsing error) must never crash the app.
+            CoroutineExceptionHandler { _, e -> android.util.Log.w("Shelfmark", "Background work failed", e) },
+    )
     private val repairingCovers = AtomicBoolean(false)
     @Volatile private var repairCoversAgain = false
 
@@ -54,6 +59,8 @@ class BookRepository(
                 } while (repairCoversAgain)
             } finally {
                 repairingCovers.set(false)
+                // A request that came in just as the last batch ended would otherwise be lost.
+                if (repairCoversAgain) repairCovers()
             }
         }
     }
@@ -117,7 +124,7 @@ class BookRepository(
                 coverUrl = c.record.coverUrl,
                 shelf = Shelf.WantToRead,
                 genres = Genres.encode(c.tags).ifEmpty { null },
-                profiledAt = System.currentTimeMillis(),
+                profiledAt = Genres.profiledNow(),
                 coverCheckedAt = System.currentTimeMillis(),
             ),
         )
@@ -206,8 +213,14 @@ class BookRepository(
             }
             return@withContext RefreshResult.NothingNew
         }
-        // A blurb or author to go by changes the genres, so they are learned again.
-        save(updated.copy(genres = null, profiledAt = 0, coverCheckedAt = if (retryCover) 0 else updated.coverCheckedAt))
+        save(updated)
+        // A blurb or author to go by changes the genres, so they are learned again ([save]
+        // keeps the old ones for an unchanged book).
+        dao.setGenres(id, null, 0)
+        if (retryCover) {
+            dao.setCover(id, updated.coverUrl, 0)
+            repairCovers()
+        }
         lastReleases = null
         RefreshResult.Updated(filled)
     }
@@ -271,21 +284,39 @@ class BookRepository(
             book.shelf != Shelf.Read -> null
             else -> book.finishedAt
         }
-        val relearn = if (identityChanged) book.copy(genres = null, profiledAt = 0) else book
-        val rowId = dao.upsert(relearn.copy(updatedAt = now, finishedAt = finishedAt))
-        if (identityChanged) lastReleases = null
-        if (book.photoPath == null && (book.coverUrl == null || CoverFinder.isGuess(book.coverUrl))) repairCovers()
+        // The edit screen holds the book as it was when opened; covers and genres found in the
+        // background since then are kept rather than written back over.
+        val merged = when {
+            previous == null -> book
+            identityChanged -> book.copy(genres = null, profiledAt = 0)
+            else -> book.copy(
+                genres = previous.genres,
+                profiledAt = previous.profiledAt,
+                coverUrl = if (book.coverUrl == null || CoverFinder.isGuess(book.coverUrl)) previous.coverUrl ?: book.coverUrl else book.coverUrl,
+                coverCheckedAt = maxOf(book.coverCheckedAt, previous.coverCheckedAt),
+            )
+        }
+        val rowId = dao.upsert(merged.copy(updatedAt = now, finishedAt = finishedAt))
+        // A replaced cover photo is no longer needed.
+        previous?.photoPath?.takeIf { it != book.photoPath }?.let { withContext(Dispatchers.IO) { File(it).delete() } }
+        // New, changed or moved books change what's suggested (and an owned book isn't new to the user).
+        if (previous == null || identityChanged || previous.shelf != book.shelf || previous.rating != book.rating) lastReleases = null
+        if (merged.photoPath == null && (merged.coverUrl == null || CoverFinder.isGuess(merged.coverUrl))) repairCovers()
         return if (book.id == 0L) rowId else book.id
     }
 
-    suspend fun setRating(id: Long, rating: Int) =
+    suspend fun setRating(id: Long, rating: Int) {
         dao.setRating(id, rating.coerceIn(0, 5), System.currentTimeMillis())
+        lastReleases = null
+    }
 
     suspend fun setNotes(id: Long, notes: String) =
         dao.setNotes(id, notes, System.currentTimeMillis())
 
-    suspend fun setShelf(id: Long, shelf: Shelf) =
+    suspend fun setShelf(id: Long, shelf: Shelf) {
         dao.setShelf(id, shelf, System.currentTimeMillis())
+        lastReleases = null
+    }
 
     /** Leaves the book out of (or back in) the taste behind new-release suggestions. */
     suspend fun setIgnoreForSuggestions(id: Long, ignore: Boolean) {
@@ -329,7 +360,10 @@ class BookRepository(
             !duplicate
         }
         dao.insertAll(fresh)
-        if (fresh.isNotEmpty()) repairCovers()
+        if (fresh.isNotEmpty()) {
+            repairCovers()
+            lastReleases = null
+        }
         ImportResult(added = fresh.size, skipped = incoming.size - fresh.size)
     }
 
@@ -337,6 +371,7 @@ class BookRepository(
 
     suspend fun delete(book: Book) {
         dao.delete(book)
+        lastReleases = null
         book.photoPath?.let { path -> withContext(Dispatchers.IO) { File(path).delete() } }
     }
 

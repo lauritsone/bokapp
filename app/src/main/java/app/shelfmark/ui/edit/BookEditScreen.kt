@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.data.CatalogRecord
@@ -80,7 +81,7 @@ fun BookEditScreen(
 ) {
     val repo = rememberRepository()
     val vm: BookEditViewModel = viewModel(
-        factory = viewModelFactory { initializer { BookEditViewModel(repo, bookId, isbn, photoPath, shelf) } },
+        factory = viewModelFactory { initializer { BookEditViewModel(repo, bookId, isbn, photoPath, shelf, createSavedStateHandle()) } },
     )
     val state by vm.state.collectAsStateWithLifecycle()
     val book = state.book
@@ -114,7 +115,13 @@ fun BookEditScreen(
         ) {
             val duplicate = state.duplicateOf
             if (duplicate != null) {
-                AlreadyInLibrary(onOpen = { onOpenExisting(duplicate) }, onScanAnother = onBack)
+                // Something typed (or a book being edited) goes back to the form, to fix the ISBN.
+                val hasForm = !isNew || book.title.isNotBlank()
+                AlreadyInLibrary(
+                    onOpen = { onOpenExisting(duplicate) },
+                    onBack = if (hasForm) vm::dismissDuplicate else onBack,
+                    backLabel = if (hasForm) R.string.back_to_form else R.string.go_back,
+                )
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.width(108.dp)) {
@@ -371,7 +378,7 @@ private fun SearchResults(results: List<CatalogRecord>, onPick: (CatalogRecord) 
 }
 
 @Composable
-private fun AlreadyInLibrary(onOpen: () -> Unit, onScanAnother: () -> Unit) {
+private fun AlreadyInLibrary(onOpen: () -> Unit, onBack: () -> Unit, backLabel: Int) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -389,8 +396,8 @@ private fun AlreadyInLibrary(onOpen: () -> Unit, onScanAnother: () -> Unit) {
         Button(onClick = onOpen, modifier = Modifier.fillMaxWidth().height(56.dp)) {
             Text(stringResource(R.string.open_book), style = MaterialTheme.typography.labelLarge)
         }
-        TextButton(onClick = onScanAnother) {
-            Text(stringResource(R.string.go_back), style = MaterialTheme.typography.labelLarge)
+        TextButton(onClick = onBack) {
+            Text(stringResource(backLabel), style = MaterialTheme.typography.labelLarge)
         }
     }
 }
