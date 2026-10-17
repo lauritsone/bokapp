@@ -106,11 +106,26 @@ class TasteProfile(books: List<Book>) {
         this[key] = (this[key] ?: 0.0) + w
     }
 
-    /** [tag]'s weight relative to the strongest in [weights], 0–1. */
-    private fun share(weights: Map<String, Double>, tag: String): Double {
-        val max = weights.values.maxOrNull()?.takeIf { it > 0 } ?: return 0.0
-        return ((weights[tag] ?: 0.0) / max).coerceIn(0.0, 1.0)
+    /** Each tag's weight relative to the strongest in [weights], 0–1. */
+    private class Shares(private val weights: Map<String, Double>) {
+        // Found once: scoring a few hundred new books asks for thousands of shares.
+        private val max = weights.values.maxOrNull()?.takeIf { it > 0 }
+
+        operator fun get(tag: String): Double =
+            max?.let { ((weights[tag] ?: 0.0) / it).coerceIn(0.0, 1.0) } ?: 0.0
     }
+
+    // Built after init has filled the weights.
+    private val genreShares by lazy { Shares(genreWeights) }
+    private val topicShares by lazy { Shares(topicWeights) }
+    private val toneShares by lazy { Shares(toneWeights) }
+    private val literatureShares by lazy { Shares(literatureWeights) }
+
+    /** The specific genres (and Dewey classes) the user reads, for [fitsGenres]. */
+    private val readGenres by lazy {
+        genreWeights.filter { (tag, w) -> w > 0 && (Genres.isSpecific(tag) || tag.startsWith(Genres.DEWEY)) }
+    }
+    private val readShares by lazy { Shares(readGenres) }
 
     /** Authors to look up new books from, best liked first. */
     fun favouriteAuthors(limit: Int): List<String> =
@@ -131,15 +146,14 @@ class TasteProfile(books: List<Book>) {
     fun fitsGenres(c: Candidate): Boolean {
         val author = authorNames(c.author).mapNotNull { authors[foldText(it)] }.maxOfOrNull { it.weight } ?: 0.0
         if (author > 0.2) return true
-        val read = genreWeights.filter { (tag, w) -> w > 0 && (Genres.isSpecific(tag) || tag.startsWith(Genres.DEWEY)) }
         // Nothing to judge by yet: the score alone decides.
-        if (read.isEmpty()) return true
+        if (readGenres.isEmpty()) return true
         val specific = c.tags.filter { Genres.isSpecific(it) || it.startsWith(Genres.DEWEY) }
         if (specific.isEmpty()) {
             val plainShare = if (novelWeight > 0) plainNovelWeight / novelWeight else 0.0
             return "novel" in c.tags && plainShare >= 0.5
         }
-        fun reads(tag: String) = share(read, tag) >= 0.15
+        fun reads(tag: String) = readShares[tag] >= 0.15
         return specific.any { tag -> reads(tag) || Genres.related[tag].orEmpty().any(::reads) }
     }
 
@@ -155,7 +169,7 @@ class TasteProfile(books: List<Book>) {
 
         // Genre: how much the user reads the candidate's best-matching genres, relative to their top genre.
         val knowsGenres = genreWeights.values.any { it > 0 }
-        fun genreShare(tag: String) = share(genreWeights, tag)
+        fun genreShare(tag: String) = genreShares[tag]
         val genreHits = c.tags.filter(Genres::isGenre)
             .map { tag -> tag to genreShare(tag) }
             .sortedByDescending { it.second }
@@ -188,8 +202,8 @@ class TasteProfile(books: List<Book>) {
         // Theme: the same subjects (friendship, grief, a village …) or the same series.
         val candidateTopics = c.tags.filter { it.startsWith(Genres.TOPIC) || it.startsWith(Genres.SERIES) }
         val series = candidateTopics.firstOrNull { it.startsWith(Genres.SERIES) && (topicWeights[it] ?: 0.0) > 0 }
-        val bestTopic = candidateTopics.filter { it.startsWith(Genres.TOPIC) }.maxByOrNull { share(topicWeights, it) }
-        val topicShare = bestTopic?.let { share(topicWeights, it) } ?: 0.0
+        val bestTopic = candidateTopics.filter { it.startsWith(Genres.TOPIC) }.maxByOrNull { topicShares[it] }
+        val topicShare = bestTopic?.let { topicShares[it] } ?: 0.0
         val themeScore = when {
             series != null -> 1.0
             topicShare > 0 -> 0.5 + 0.5 * topicShare
@@ -214,7 +228,7 @@ class TasteProfile(books: List<Book>) {
 
         // Which literature it comes from (Norwegian, English, Swedish …), a small nudge.
         val literature = c.tags.firstOrNull { it.startsWith(Genres.LITERATURE) }
-        val literatureScore = if (literature == null || literatureWeights.isEmpty()) 0.5 else share(literatureWeights, literature)
+        val literatureScore = if (literature == null || literatureWeights.isEmpty()) 0.5 else literatureShares[literature]
 
         val content = (0.55 * genreScore + 0.20 * themeScore + 0.15 * formScore + 0.05 * literatureScore) / 0.95
         // A favourite author lifts a book a long way; a new author is no mark against it.
@@ -225,7 +239,7 @@ class TasteProfile(books: List<Book>) {
         val tones = c.tags.filter { it.startsWith(Genres.TONE) }
         // Only judged when most of the user's books say something about their mood.
         val knowsTone = likedWeight > 0 && toneTaggedWeight / likedWeight >= 0.5
-        if (knowsTone && tones.isNotEmpty() && tones.none { share(toneWeights, it) >= 0.15 }) score *= 0.7
+        if (knowsTone && tones.isNotEmpty() && tones.none { toneShares[it] >= 0.15 }) score *= 0.7
 
         // Children's books for a grown-up reader, and the other way round.
         val audienceKnown = juvenileWeight + adultWeight

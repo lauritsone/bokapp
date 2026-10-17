@@ -1,8 +1,14 @@
 package app.shelfmark.data
 
 import android.text.Html
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -23,59 +29,68 @@ data class BookInfo(
 )
 
 /**
- * Looks up a book by ISBN. Tries Google Books first (best coverage + descriptions),
- * then Open Library, then the Norwegian (NB.no) and Swedish (Libris) national library
- * catalogues, which cover Nordic books the others often miss. None needs an API key.
+ * Looks up a book by ISBN. Google Books (best coverage and descriptions), Open Library and
+ * the Norwegian national library ([nb]) are asked at once; the first of them to know the
+ * book wins, in that order, and NB.no adds the series and a Norwegian blurb. The Swedish
+ * national library (Libris) is asked only when none of them knows it. None needs an API key.
  */
-class BookLookup {
+class BookLookup(private val nb: NbCatalog) {
 
     /**
      * @return the book, or null if no source knows this ISBN.
      * @throws IOException if no source could be reached at all (offline, etc).
      */
     suspend fun lookup(isbn: String): BookInfo? = withContext(Dispatchers.IO) {
-        var reachedASource = false
-        val sources: List<(String) -> BookInfo?> = listOf(::fromGoogleBooks, ::fromOpenLibrary, ::fromNationalLibraryNorway, ::fromLibris)
-        // On a poor connection each source can hang until its timeout; past this, stop trying.
+        val reached = AtomicBoolean(false)
+        // On a poor connection a source can hang until its timeout; past this, it is given up.
         val giveUpAt = System.currentTimeMillis() + LOOKUP_BUDGET_MS
-        for (source in sources) {
-            if (System.currentTimeMillis() > giveUpAt) break
-            try {
-                val info = source(isbn)
-                reachedASource = true
-                if (info != null) {
-                    // The National Library knows the series (and often has a Norwegian blurb)
-                    // when another source answered first.
-                    val nb = if (source != sources[2] && System.currentTimeMillis() < giveUpAt) {
-                        runCatching { fromNationalLibraryNorway(isbn) }.getOrNull()
-                    } else {
-                        null
-                    }
-                    val withSeries = info.copy(
-                        series = info.series ?: nb?.series,
-                        nextInSeries = info.nextInSeries ?: nb?.nextInSeries,
-                        description = info.description ?: nb?.description,
-                        coverUrl = info.coverUrl ?: nb?.coverUrl,
-                    )
-                    // Only keep the guessed Open Library cover if it really exists; otherwise
-                    // the cover repair in BookRepository looks elsewhere later.
-                    return@withContext if (withSeries.coverUrl == null) {
-                        withSeries.copy(coverUrl = openLibraryCover(isbn).takeIf { runCatching { imageExists(it) }.getOrDefault(false) })
-                    } else {
-                        withSeries
-                    }
-                }
-            } catch (e: JSONException) {
-                reachedASource = true
-            } catch (e: IOException) {
-                // try the next source
+        suspend fun attempt(source: suspend (String) -> BookInfo?): BookInfo? = try {
+            withTimeout((giveUpAt - System.currentTimeMillis()).coerceAtLeast(1)) { source(isbn) }
+                .also { reached.set(true) }
+        } catch (e: TimeoutCancellationException) {
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: JSONException) {
+            reached.set(true)
+            null
+        } catch (e: IOException) {
+            null
+        }
+
+        val info = coroutineScope {
+            val google = async { attempt(::fromGoogleBooks) }
+            val openLibrary = async { attempt(::fromOpenLibrary) }
+            val norway = async { attempt(::fromNationalLibraryNorway) }
+            val first = google.await() ?: openLibrary.await()
+            // Google answered: Open Library's copy isn't needed.
+            openLibrary.cancel()
+            val fromNb = norway.await()
+            when {
+                first != null -> first.copy(
+                    series = first.series ?: fromNb?.series,
+                    nextInSeries = first.nextInSeries ?: fromNb?.nextInSeries,
+                    description = first.description ?: fromNb?.description,
+                    coverUrl = first.coverUrl ?: fromNb?.coverUrl,
+                )
+                fromNb != null -> fromNb
+                else -> attempt(::fromLibris)
             }
         }
-        if (!reachedASource) throw IOException("No book database could be reached")
-        null
+        if (info == null) {
+            if (!reached.get()) throw IOException("No book database could be reached")
+            return@withContext null
+        }
+        // Only keep the guessed Open Library cover if it really exists; otherwise
+        // the cover repair in BookRepository looks elsewhere later.
+        if (info.coverUrl == null) {
+            info.copy(coverUrl = openLibraryCover(isbn).takeIf { runCatching { imageExists(it) }.getOrDefault(false) })
+        } else {
+            info
+        }
     }
 
-    private fun fromGoogleBooks(isbn: String): BookInfo? {
+    private suspend fun fromGoogleBooks(isbn: String): BookInfo? {
         val root = JSONObject(httpGet("https://www.googleapis.com/books/v1/volumes?q=isbn:$isbn", TIMEOUT_MS))
         val items = root.optJSONArray("items") ?: return null
         if (items.length() == 0) return null
@@ -97,7 +112,7 @@ class BookLookup {
         )
     }
 
-    private fun fromOpenLibrary(isbn: String): BookInfo? {
+    private suspend fun fromOpenLibrary(isbn: String): BookInfo? {
         val root = JSONObject(
             httpGet("https://openlibrary.org/api/books?bibkeys=ISBN:$isbn&format=json&jscmd=data", TIMEOUT_MS),
         )
@@ -116,33 +131,31 @@ class BookLookup {
         )
     }
 
-    private fun fromNationalLibraryNorway(isbn: String): BookInfo? {
-        val root = JSONObject(httpGet("https://api.nb.no/catalog/v1/items?q=isbn:$isbn&size=5", TIMEOUT_MS))
-        val items = root.optJSONObject("_embedded")?.optJSONArray("items") ?: return null
-        val item = (0 until items.length()).map { items.getJSONObject(it) }.firstOrNull { item ->
-            val isbns = item.optJSONObject("metadata")?.optJSONObject("identifiers")?.optJSONArray("isbn13")
-            isbns != null && (0 until isbns.length()).any { isbns.optString(it) == isbn }
-        } ?: return null
-        val data = item.getJSONObject("metadata")
-        val title = data.str("title") ?: return null
-        val origin = data.optJSONObject("originInfo")
+    private suspend fun fromNationalLibraryNorway(isbn: String): BookInfo? {
+        val record = nb.findByIsbn(isbn, cached = true) ?: return null
         // The full record names the main author apart from translators, and has the blurb.
-        val details = runCatching { NbCatalog.parseMods(httpGet("https://api.nb.no/catalog/v1/metadata/${item.optString("id")}/mods", TIMEOUT_MS)) }.getOrNull()
+        val details = try {
+            nb.details(record.id, cached = true)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
         return BookInfo(
             isbn = isbn,
-            title = ReleaseFinder.displayTitle(title),
-            authors = details?.author ?: data.optJSONArray("creators").names().firstOrNull()?.let(::personName).orEmpty(),
-            publisher = origin?.str("publisher"),
-            publishedDate = origin?.str("issued")?.take(4),
-            pageCount = data.optInt("pageCount").takeIf { it > 0 },
+            title = ReleaseFinder.displayTitle(record.title),
+            authors = details?.author ?: record.creators.firstOrNull()?.let(::personName).orEmpty(),
+            publisher = record.publisher,
+            publishedDate = record.year?.toString(),
+            pageCount = record.pageCount,
             description = details?.summary,
-            coverUrl = item.optJSONObject("_links")?.optJSONObject("thumbnail_large")?.str("href"),
+            coverUrl = record.coverUrl,
             series = details?.series,
             nextInSeries = details?.succeeding,
         )
     }
 
-    private fun fromLibris(isbn: String): BookInfo? {
+    private suspend fun fromLibris(isbn: String): BookInfo? {
         val root = JSONObject(httpGet("https://libris.kb.se/xsearch?query=isbn:$isbn&format=json", TIMEOUT_MS))
         val list = root.optJSONObject("xsearch")?.optJSONArray("list") ?: return null
         val data = (0 until list.length()).map { list.getJSONObject(it) }.firstOrNull { record ->

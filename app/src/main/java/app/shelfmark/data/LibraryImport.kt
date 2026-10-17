@@ -123,6 +123,8 @@ object LibraryImport {
         "bookshelves" to listOf("bookshelves"),
     )
 
+    private val nonLetters = Regex("[^a-z]")
+
     /** Goodreads puts the series in the title: "Snømannen (Harry Hole, #7)". */
     private val seriesInTitle = Regex("^(.+?)\\s*\\(([^()]+?),?\\s*#\\s*([0-9]+(?:[.,][0-9]+)?)\\)$")
 
@@ -144,7 +146,7 @@ object LibraryImport {
             val inTitle = if (cell("series") == null) seriesInTitle.find(fullTitle) else null
             val title = inTitle?.groupValues?.get(1) ?: fullTitle
             val tags = cell("tags") ?: cell("bookshelves")?.split(',')
-                ?.map { it.trim() }?.filterNot { foldText(it).replace(Regex("[^a-z]"), "") in goodreadsShelves }?.joinToString(", ")
+                ?.map { it.trim() }?.filterNot { foldText(it).replace(nonLetters, "") in goodreadsShelves }?.joinToString(", ")
             val authors = listOfNotNull(cell("authors"), cell("extraAuthors")).joinToString(", ")
             val isbn = cleanIsbn(cell("isbn13")) ?: cleanIsbn(cell("isbn"))
             val now = System.currentTimeMillis()

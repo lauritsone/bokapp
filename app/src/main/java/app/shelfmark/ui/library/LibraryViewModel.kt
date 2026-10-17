@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -82,59 +83,100 @@ class LibraryViewModel(
         return texts
     }
 
-    val state: StateFlow<LibraryState> = combine(repo.books.conflate(), query, sort, shelf, filter) { all, q, sortName, shelfCode, f ->
+    /**
+     * What the screen needs from the books themselves (tags, counts, sort keys, search text),
+     * worked out once each time they change rather than on every keystroke.
+     */
+    private inner class LibraryIndex(val all: List<Book>) {
+        /** Each book's tags, folded, by position in [all]. */
+        val tagKeys: List<Set<String>>
+
+        /** The user's tags, most used first, as first spelled. */
+        val tags: List<String>
+        val allTagKeys: Set<String>
+
+        init {
+            val counts = LinkedHashMap<String, Int>()
+            val spelling = HashMap<String, String>()
+            tagKeys = all.map { book ->
+                book.tagList().mapTo(HashSet()) { tag ->
+                    foldText(tag).also { key ->
+                        counts[key] = (counts[key] ?: 0) + 1
+                        spelling.putIfAbsent(key, tag)
+                    }
+                }
+            }
+            tags = counts.entries.sortedByDescending { it.value }.map { spelling.getValue(it.key) }
+            allTagKeys = counts.keys
+        }
+
+        val shelfCounts = all.groupingBy { it.shelf }.eachCount()
+        val lentCount = all.count { it.lentTo != null }
+        val averageRating = all.filter { it.shelf == Shelf.Read && it.rating > 0 }.map { it.rating }
+            .takeIf { it.isNotEmpty() }?.average()
+
+        // Only worked out when a search or sort needs them.
+        val searchTexts by lazy { foldedTexts(all) }
+
+        // The phone's alphabet: in Norwegian Æ, Ø and Å come last, and É sorts with E.
+        private val collator = Collator.getInstance()
+        val titleKeys by lazy { all.map { collator.getCollationKey(it.title) } }
+        val authorKeys by lazy { all.map { collator.getCollationKey(it.authors) } }
+        val seriesKeys by lazy { all.map { collator.getCollationKey(it.series.orEmpty()) } }
+    }
+
+    private val index = repo.books.conflate().map { LibraryIndex(it) }
+
+    val state: StateFlow<LibraryState> = combine(index, query, sort, shelf, filter) { ix, q, sortName, shelfCode, f ->
+        val all = ix.all
         val s = SortMode.entries.firstOrNull { it.name == sortName } ?: SortMode.Recent
         val sh = Shelf.fromCode(shelfCode)
         // A search or filter looks through every shelf; otherwise show the selected shelf.
         val terms = SearchMatcher.terms(q)
-        val tags = all.flatMap { it.tagList() }.groupBy(::foldText)
-            .entries.sortedByDescending { it.value.size }.map { it.value.first() }
         // A filter nothing matches any more (the last lent book came back, a tag was removed)
         // is dropped, so the shelves come back instead of an empty list with no way out.
         val tagKey = f?.takeIf { it != LENT_FILTER }?.let(::foldText)
         val active = when {
-            f == LENT_FILTER -> f.takeIf { all.any { it.lentTo != null } }
-            tagKey != null -> f.takeIf { tags.any { foldText(it) == tagKey } }
+            f == LENT_FILTER -> f.takeIf { ix.lentCount > 0 }
+            tagKey != null -> f.takeIf { tagKey in ix.allTagKeys }
             else -> null
         }
-        val texts = if (terms.isEmpty()) null else foldedTexts(all)
-        val filtered = all.filterIndexed { i, book ->
+        val texts = if (terms.isEmpty()) null else ix.searchTexts
+        val picked = all.indices.filter { i ->
+            val book = all[i]
             when {
                 active == LENT_FILTER -> book.lentTo != null
-                active != null -> book.tagList().any { foldText(it) == tagKey }
-                tagKey != null -> book.tagList().any { foldText(it) == tagKey }
+                active != null -> tagKey in ix.tagKeys[i]
                 terms.isEmpty() -> book.shelf == sh
                 else -> true
             } && (texts == null || SearchMatcher.matches(texts[i], terms))
         }
         val sorted = when (s) {
-            SortMode.Recent -> filtered.sortedByDescending { it.addedAt }
-            SortMode.Rating -> filtered.sortedWith(
-                compareByDescending<Book> { it.rating }.thenByDescending { it.addedAt },
+            SortMode.Recent -> picked.sortedByDescending { all[it].addedAt }
+            SortMode.Rating -> picked.sortedWith(
+                compareByDescending<Int> { all[it].rating }.thenByDescending { all[it].addedAt },
             )
-            // The phone's alphabet: in Norwegian Æ, Ø and Å come last, and É sorts with E.
-            SortMode.Title -> filtered.sortedWith(compareBy(Collator.getInstance()) { it.title })
-            SortMode.Author -> filtered.sortedWith(compareBy(Collator.getInstance()) { it.authors })
+            SortMode.Title -> picked.sortedBy { ix.titleKeys[it] }
+            SortMode.Author -> picked.sortedBy { ix.authorKeys[it] }
             // Each series together and in order; books outside a series after them.
-            SortMode.Series -> filtered.sortedWith(
-                compareBy<Book> { it.series == null }
-                    .thenBy(Collator.getInstance()) { it.series.orEmpty() }
-                    .thenBy { it.seriesOrder() }
-                    .thenBy(Collator.getInstance()) { it.title },
+            SortMode.Series -> picked.sortedWith(
+                compareBy<Int> { all[it].series == null }
+                    .thenBy { ix.seriesKeys[it] }
+                    .thenBy { all[it].seriesOrder() }
+                    .thenBy { ix.titleKeys[it] },
             )
         }
-        val rated = all.filter { it.shelf == Shelf.Read && it.rating > 0 }
         LibraryState(
-            books = sorted,
+            books = sorted.map { all[it] },
             totalCount = all.size,
-            shelfCounts = all.groupingBy { it.shelf }.eachCount(),
-            averageRating = if (rated.isEmpty()) null else rated.map { it.rating }.average(),
+            shelfCounts = ix.shelfCounts,
+            averageRating = ix.averageRating,
             shelf = sh,
             searching = terms.isNotEmpty() || active != null,
             sort = s,
             loaded = true,
-            tags = tags,
-            lentCount = all.count { it.lentTo != null },
+            tags = ix.tags,
+            lentCount = ix.lentCount,
             filter = active,
         )
     }

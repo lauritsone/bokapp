@@ -31,7 +31,12 @@ data class ReleaseResult(val matches: List<Match>, val profileSize: Int, val ign
  */
 class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private val ol: OlCatalog) {
 
-    private val detailsCache = ConcurrentHashMap<String, NbDetails>()
+    /** Records read this session; capped, since a session can read thousands. */
+    private val detailsCache = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, NbDetails>(64, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, NbDetails>) = size > DETAILS_CACHE_SIZE
+        },
+    )
     private val firstYearsCache = ConcurrentHashMap<String, Map<String, Int>>()
 
     /** @throws IOException if the catalogue can't be reached at all. */
@@ -97,21 +102,32 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
 
         val owned = library.mapNotNull { it.isbn?.let { isbn -> Isbn.normalize(isbn) ?: isbn } }.toSet()
         // Another author's book can share a title with one in the library ("Hjem").
-        val ownedTitles = library.groupBy({ titleKey(it.title) }, { TasteProfile.authorNames(it.authors).firstOrNull() })
-        fun inLibrary(r: CatalogRecord): Boolean {
-            if (r.isbn != null && (Isbn.normalize(r.isbn) ?: r.isbn) in owned) return true
-            val authors = ownedTitles[titleKey(r.title)] ?: return false
-            return authors.any { it == null || r.creators.isEmpty() || wroteBy(r, it) }
+        val ownedTitles = library.groupBy(
+            { titleKey(it.title) },
+            { TasteProfile.authorNames(it.authors).firstOrNull()?.let(::nameWords) },
+        )
+        // Names are folded once each, not again for every comparison: there can be thousands of records.
+        val favourites = profile.favouriteAuthors(limit = 8).map(::nameWords)
+        class Indexed(val record: CatalogRecord, val title: String, val creators: List<Set<String>>) {
+            fun by(author: Set<String>) = creators.any { it.containsAll(author) }
         }
-        val authors = profile.favouriteAuthors(limit = 8)
+        fun inLibrary(f: Indexed): Boolean {
+            val r = f.record
+            if (r.isbn != null && (Isbn.normalize(r.isbn) ?: r.isbn) in owned) return true
+            val authors = ownedTitles[f.title] ?: return false
+            return authors.any { it == null || r.creators.isEmpty() || f.by(it) }
+        }
         val fresh = found
+            .map { Indexed(it, titleKey(it.title), it.creators.map(::nameWords)) }
             .filterNot(::inLibrary)
             // The same book is often catalogued again a year later; keep the first.
-            .sortedWith(compareBy({ it.year ?: Int.MAX_VALUE }, { -it.indexedAt }))
-            .distinctBy { titleKey(it.title) + "|" + it.creators.firstOrNull()?.let(::foldText) + "|" + it.language }
+            .sortedWith(compareBy({ it.record.year ?: Int.MAX_VALUE }, { -it.record.indexedAt }))
+            .distinctBy { it.title + "|" + it.record.creators.firstOrNull()?.let(::foldText) + "|" + it.record.language }
             // Reading each record takes a request, so favourite authors and the newest books go first.
-            .sortedWith(compareBy({ r -> authors.none { wroteBy(r, it) } }, { -(it.year ?: 0) }, { -it.indexedAt }))
+            .map { it to favourites.none(it::by) }
+            .sortedWith(compareBy({ it.second }, { -(it.first.record.year ?: 0) }, { -it.first.record.indexedAt }))
             .take(MAX_DETAILS)
+            .map { it.first.record }
         val done = AtomicInteger()
         val unreachable = AtomicInteger()
         onProgress(ReleaseProgress.ReadingDetails(0, fresh.size))
@@ -140,7 +156,11 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         val scored = candidates.filter(profile::fitsGenres).map(profile::score).sortedByDescending { it.percent }
         // Checking takes a request per author, so only the books that may be shown are checked.
         val shortlist = scored.filter { it.percent >= MIN_PERCENT }.takeIf { it.size >= 10 } ?: scored.take(20)
-        val matches = concurrently(shortlist) { match -> match.takeUnless { isReissue(it.candidate, year) } }.filterNotNull()
+        // One bibliography request per author, however many of their books are on the list.
+        val firstYearsBy = concurrently(shortlist.mapNotNull { firstAuthor(it.candidate) }.distinct()) { author ->
+            author to cachedFirstYears(author)
+        }.toMap()
+        val matches = shortlist.filterNot { isReissue(it.candidate, year, firstYearsBy) }
             // Poor matches only clutter the list, but a thin library should still see something.
             .let { all -> all.filter { it.percent >= MIN_PERCENT }.takeIf { it.size >= 10 } ?: all.take(10) }
         return ReleaseResult(matches, profile.bookCount, library.count { it.ignoreForSuggestions })
@@ -170,19 +190,24 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         }
     }
 
-    /** Whether the author's bibliography has this title from before last year. */
-    private suspend fun isReissue(c: Candidate, year: Int): Boolean {
-        if (c.record.knownFirstEdition) return false
-        val author = c.record.creators.firstOrNull() ?: return false
-        val firstYears = try {
-            firstYearsCache[author] ?: firstYears(author).also { firstYearsCache[author] = it }
-        } catch (e: IOException) {
-            return false
-        } catch (e: JSONException) {
-            return false
-        }
+    /** The author whose bibliography tells whether [c] is a reissue; null if it needn't be checked. */
+    private fun firstAuthor(c: Candidate): String? =
+        if (c.record.knownFirstEdition) null else c.record.creators.firstOrNull()
+
+    /** Whether the author's bibliography, from [firstYearsBy], has this title from before last year. */
+    private fun isReissue(c: Candidate, year: Int, firstYearsBy: Map<String, Map<String, Int>?>): Boolean {
+        val firstYears = firstAuthor(c)?.let { firstYearsBy[it] } ?: return false
         val first = firstYears[titleKey(c.record.title)] ?: return false
         return first < year - 1
+    }
+
+    /** [firstYears], kept for the session; null if the catalogue couldn't say. */
+    private suspend fun cachedFirstYears(author: String): Map<String, Int>? = try {
+        firstYearsCache[author] ?: firstYears(author).also { firstYearsCache[author] = it }
+    } catch (e: IOException) {
+        null
+    } catch (e: JSONException) {
+        null
     }
 
     /** Title → the earliest year the catalogue has it, for one author's books in Norwegian. */
@@ -269,6 +294,9 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         /** How many new books to read in full (one request each) and score. */
         private const val MAX_DETAILS = 300
 
+        /** Catalogue records kept in memory between searches. */
+        private const val DETAILS_CACHE_SIZE = 1000
+
         /** NB.no's subject word for each genre tag. */
         private val nbSubjects = mapOf(
             "feelgood" to "feelgood", "crime" to "krim", "fantasy" to "fantasy", "scifi" to "science fiction",
@@ -295,7 +323,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
 
         /** "Minnesota : roman" → "Minnesota"; "Epstein : døde menn snakker ikke" → "Epstein: døde menn snakker ikke". */
         fun displayTitle(title: String): String {
-            val clean = title.replace(Regex("\\s+"), " ").trim()
+            val clean = title.replace(whitespace, " ").trim()
             val main = clean.substringBefore(" : ")
             val sub = clean.substringAfter(" : ", "")
             return when {
@@ -308,10 +336,15 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         /** The main title, folded, for telling whether two records are the same book. */
         fun titleKey(title: String) = foldText(displayTitle(title).substringBefore(": "))
 
+        private val whitespace = Regex("\\s+")
+
+        /** A name as its folded words, in any order: "Nesbø, Jo" and "Jo Nesbø" give the same set. */
+        fun nameWords(name: String): Set<String> = foldText(name).split(' ').toSet()
+
         /** Whether the record lists [author] among its creators ("Nesbø, Jo" matches "Jo Nesbø"). */
         fun wroteBy(record: CatalogRecord, author: String): Boolean {
-            val wanted = foldText(author).split(' ').toSet()
-            return record.creators.any { foldText(it).split(' ').toSet().containsAll(wanted) }
+            val wanted = nameWords(author)
+            return record.creators.any { nameWords(it).containsAll(wanted) }
         }
     }
 }

@@ -78,9 +78,11 @@ enum class BookFormat(val code: Int, val key: String) {
     companion object {
         fun fromCode(code: Int) = entries.firstOrNull { it.code == code } ?: Paper
 
+        private val nonLetters = Regex("[^a-z]")
+
         /** "ebook", "e-bok", "Audible" … as a format; paper for anything else. */
         fun parse(value: String?): BookFormat {
-            val v = value?.let { foldText(it).replace(Regex("[^a-z]"), "") } ?: return Paper
+            val v = value?.let { foldText(it).replace(nonLetters, "") } ?: return Paper
             return when {
                 v.startsWith("e") && ("book" in v || "bok" in v || v == "e") || "kindle" in v || "epub" in v -> Ebook
                 "audio" in v || "lyd" in v || "audible" in v || "storytel" in v -> Audiobook

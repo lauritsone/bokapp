@@ -226,7 +226,6 @@ private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit, p
     }
 
     DisposableEffect(lifecycleOwner) {
-        cameraController.setImageAnalysisAnalyzer(executor, analyzer)
         cameraController.bindToLifecycle(lifecycleOwner)
         onDispose {
             cameraController.clearImageAnalysisAnalyzer()
@@ -235,7 +234,15 @@ private fun CameraScanner(onIsbn: (String) -> Unit, onPhoto: (String) -> Unit, p
             executor.shutdown()
         }
     }
-    LaunchedEffect(mode) { error = null }
+    // Frames are only analysed while looking for a barcode; taking a cover photo needs none.
+    LaunchedEffect(mode) {
+        error = null
+        if (mode == ScanMode.Barcode) {
+            cameraController.setImageAnalysisAnalyzer(executor, analyzer)
+        } else {
+            cameraController.clearImageAnalysisAnalyzer()
+        }
+    }
     LaunchedEffect(mode, paused) { analyzer.active = mode == ScanMode.Barcode && !paused }
 
     fun takePhoto() {

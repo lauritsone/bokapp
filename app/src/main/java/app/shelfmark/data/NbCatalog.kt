@@ -91,7 +91,7 @@ class NbCatalog(private val cache: DiskCache? = null) {
         cache?.prune()
     }
 
-    private fun <T> fetch(url: String, cached: Boolean, parse: (String) -> T): T {
+    private suspend fun <T> fetch(url: String, cached: Boolean, parse: (String) -> T): T {
         val text = if (cached && cache != null) cache.get(url) else httpGet(url)
         return try {
             parse(text)
@@ -134,9 +134,23 @@ class NbCatalog(private val cache: DiskCache? = null) {
 
         private fun element(name: String) = Regex("<(?:mods:)?$name(\\s[^>]*)?>([^<]*)</(?:mods:)?$name>")
 
+        // Built once: a search for new releases reads a few hundred records.
+        private val genreElement = element("genre")
+        private val abstractElement = element("abstract")
+        private val noteElement = element("note")
+        private val topicElement = element("topic")
+        private val audienceElement = element("targetAudience")
+        private val languagePattern = Regex("<(?:mods:)?language>\\s*<(?:mods:)?languageTerm[^>]*>([^<]+)<")
+        private val deweyPattern = Regex("<(?:mods:)?classification[^>]*authority=\"ddc\"[^>]*>\\s*([0-9][0-9.]*)")
+        private val relatedPatterns = listOf("preceding", "succeeding").associateWith { type ->
+            Regex("<(?:mods:)?relatedItem type=\"$type\">\\s*<(?:mods:)?titleInfo>\\s*<(?:mods:)?title>([^<]+)<")
+        }
+        private val byPrefix = Regex("^(av|by|tekst:?|skrevet av)\\s+", RegexOption.IGNORE_CASE)
+        private val numericEntity = Regex("&#([xX][0-9a-fA-F]+|\\d+);")
+
         /** Reads the few MODS fields we need with simple patterns, so it also runs in plain JVM tests. */
         fun parseMods(xml: String): NbDetails {
-            val genreTags = element("genre").findAll(xml).map { it.groupValues[1] to unescape(it.groupValues[2]).trim() }.toList()
+            val genreTags = genreElement.findAll(xml).map { it.groupValues[1] to unescape(it.groupValues[2]).trim() }.toList()
             // Plain <genre> elements hold the subject genres; ones with attributes are format codes.
             val genres = genreTags.filter { (attrs, _) -> attrs.isBlank() }.map { it.second }.filter { it.isNotEmpty() }.distinct()
             val forms = genreTags.filter { (attrs, _) -> "marcgt" in attrs || "literaryform" in attrs }.map { it.second.lowercase() }
@@ -146,15 +160,15 @@ class NbCatalog(private val cache: DiskCache? = null) {
                 else -> null
             }
             // The first <language> block is the book's own; later ones (objectPart) are originals.
-            val language = Regex("<(?:mods:)?language>\\s*<(?:mods:)?languageTerm[^>]*>([^<]+)<").find(xml)?.groupValues?.get(1)?.trim()
-            val summary = element("abstract").find(xml)?.groupValues?.get(2)?.let(::unescape)?.trim()?.ifEmpty { null }
-            val responsibility = element("note").findAll(xml)
+            val language = languagePattern.find(xml)?.groupValues?.get(1)?.trim()
+            val summary = abstractElement.find(xml)?.groupValues?.get(2)?.let(::unescape)?.trim()?.ifEmpty { null }
+            val responsibility = noteElement.findAll(xml)
                 .firstOrNull { "statement of responsibility" in it.groupValues[1] }
                 ?.groupValues?.get(2)?.let(::unescape)
-            val topics = element("topic").findAll(xml).map { unescape(it.groupValues[2]).trim() }.filter { it.isNotEmpty() }.distinct().toList()
-            val audience = element("targetAudience").find(xml)?.groupValues?.get(2)?.let(::audienceOf)
-            val dewey = Regex("<(?:mods:)?classification[^>]*authority=\"ddc\"[^>]*>\\s*([0-9][0-9.]*)").find(xml)?.groupValues?.get(1)
-            fun related(type: String) = Regex("<(?:mods:)?relatedItem type=\"$type\">\\s*<(?:mods:)?titleInfo>\\s*<(?:mods:)?title>([^<]+)<")
+            val topics = topicElement.findAll(xml).map { unescape(it.groupValues[2]).trim() }.filter { it.isNotEmpty() }.distinct().toList()
+            val audience = audienceElement.find(xml)?.groupValues?.get(2)?.let(::audienceOf)
+            val dewey = deweyPattern.find(xml)?.groupValues?.get(1)
+            fun related(type: String) = relatedPatterns.getValue(type)
                 .find(xml)?.groupValues?.get(1)?.let(::unescape)?.trim()?.ifEmpty { null }
             return NbDetails(
                 genres, fiction, language, summary, responsibility?.let(::mainAuthor), topics, audience, dewey,
@@ -175,12 +189,12 @@ class NbCatalog(private val cache: DiskCache? = null) {
         /** "Ulrika Rolfsdotter ; oversatt av Nina Wessel" → "Ulrika Rolfsdotter". */
         private fun mainAuthor(statement: String): String? =
             statement.split(";").first()
-                .replace(Regex("^(av|by|tekst:?|skrevet av)\\s+", RegexOption.IGNORE_CASE), "")
+                .replace(byPrefix, "")
                 .trim().trimEnd('.', ',').ifEmpty { null }
 
         private fun unescape(s: String) = s
             .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'")
-            .replace(Regex("&#([xX][0-9a-fA-F]+|\\d+);")) { m ->
+            .replace(numericEntity) { m ->
                 val code = m.groupValues[1].let { if (it[0] == 'x' || it[0] == 'X') it.drop(1).toIntOrNull(16) else it.toIntOrNull() }
                 code?.takeIf(Character::isValidCodePoint)?.let { String(Character.toChars(it)) } ?: m.value
             }

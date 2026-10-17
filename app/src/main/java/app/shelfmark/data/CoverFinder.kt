@@ -17,10 +17,12 @@ import java.net.URLEncoder
 class CoverFinder(private val nb: NbCatalog) {
 
     /**
+     * [guessChecked] means the guessed Open Library link by ISBN was just found missing, so
+     * it isn't asked for again.
      * @throws IOException if a source couldn't be reached and none had a cover, so the book
      * is tried again later instead of being marked as having none.
      */
-    suspend fun find(book: Book): String? = withContext(Dispatchers.IO) {
+    suspend fun find(book: Book, guessChecked: Boolean = false): String? = withContext(Dispatchers.IO) {
         var failed = false
         suspend fun attempt(block: suspend () -> String?): String? = try {
             block()
@@ -35,7 +37,7 @@ class CoverFinder(private val nb: NbCatalog) {
         val author = TasteProfile.authorNames(book.authors).firstOrNull()
         val found = if (isbn != null) {
             attempt { nb.findByIsbn(isbn)?.coverUrl }
-                ?: attempt { openLibraryByIsbn(isbn) }
+                ?: (if (guessChecked) null else attempt { openLibraryByIsbn(isbn) })
                 ?: attempt { googleByIsbn(isbn) }
         } else {
             null
@@ -49,10 +51,10 @@ class CoverFinder(private val nb: NbCatalog) {
         found
     }
 
-    private fun openLibraryByIsbn(isbn: String): String? =
-        "https://covers.openlibrary.org/b/isbn/$isbn-L.jpg?default=false".takeIf(::imageExists)
+    private suspend fun openLibraryByIsbn(isbn: String): String? =
+        "https://covers.openlibrary.org/b/isbn/$isbn-L.jpg?default=false".takeIf { imageExists(it) }
 
-    private fun googleByIsbn(isbn: String): String? {
+    private suspend fun googleByIsbn(isbn: String): String? {
         val items = JSONObject(httpGet("https://www.googleapis.com/books/v1/volumes?q=isbn:$isbn")).optJSONArray("items")
         val images = items?.optJSONObject(0)?.optJSONObject("volumeInfo")?.optJSONObject("imageLinks") ?: return null
         return (images.optString("thumbnail").ifEmpty { images.optString("smallThumbnail") }).ifEmpty { null }
@@ -66,7 +68,7 @@ class CoverFinder(private val nb: NbCatalog) {
             .firstNotNullOfOrNull { it.coverUrl }
     }
 
-    private fun openLibraryByTitle(title: String, author: String): String? {
+    private suspend fun openLibraryByTitle(title: String, author: String): String? {
         val url = "https://openlibrary.org/search.json?title=" + enc(title) + "&author=" + enc(author) +
             "&fields=title,cover_i&limit=5"
         val docs = JSONObject(httpGet(url, timeoutMs = 15_000)).optJSONArray("docs") ?: return null

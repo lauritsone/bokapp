@@ -7,8 +7,8 @@ import app.shelfmark.data.Book
 import app.shelfmark.data.BookFormat
 import app.shelfmark.data.BookInfo
 import app.shelfmark.data.BookRepository
+import app.shelfmark.data.DetailRefresh
 import app.shelfmark.data.CatalogRecord
-import app.shelfmark.data.ReleaseFinder
 import app.shelfmark.data.Isbn
 import app.shelfmark.data.Shelf
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -185,12 +185,8 @@ class BookEditViewModel(
     )
 
     /** Whether a looked-up title is the book already typed (blank counts as a match). */
-    private fun sameBook(typed: String, found: String): Boolean {
-        if (typed.isBlank()) return true
-        val a = ReleaseFinder.titleKey(typed)
-        val b = ReleaseFinder.titleKey(found)
-        return a == b || a.startsWith(b) || b.startsWith(a)
-    }
+    private fun sameBook(typed: String, found: String): Boolean =
+        typed.isBlank() || DetailRefresh.sameTitle(typed, found)
 
     fun save() {
         val book = _state.value.book

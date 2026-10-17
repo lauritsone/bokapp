@@ -28,7 +28,9 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -130,6 +132,8 @@ fun LibraryScreen(
     val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(repo, createSavedStateHandle()) } })
     val state by vm.state.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
+    // The field keeps its own text, so fast typing never drops a letter while the list catches up.
+    var searchText by rememberSaveable { mutableStateOf(query) }
     val snackbar = remember { SnackbarHostState() }
     val export = rememberExporter(repo, snackbar)
     val import = rememberImporter(repo, snackbar)
@@ -193,7 +197,14 @@ fun LibraryScreen(
                     }
                 }
                 item(key = "search") {
-                    SearchField(query, vm::setQuery, Modifier.padding(top = 12.dp))
+                    SearchField(
+                        searchText,
+                        onChange = {
+                            searchText = it
+                            vm.setQuery(it)
+                        },
+                        Modifier.padding(top = 12.dp),
+                    )
                 }
                 item(key = "sort") {
                     SortRow(state.sort, vm::setSort, Modifier.padding(top = 12.dp, bottom = 8.dp))
@@ -599,7 +610,9 @@ private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState):
         if (uri == null) return
         scope.launch {
             val message = try {
-                val out = context.contentResolver.openOutputStream(uri) ?: throw IOException("No output stream")
+                // Opening a file on Drive and the like can take a while; not on the thread that draws the screen.
+                val out = withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
+                    ?: throw IOException("No output stream")
                 // Finishes even if the screen goes away (rotation, opening a book) part way.
                 val count = withContext(NonCancellable) { repo.export(format, out) }
                 resources.getQuantityString(R.plurals.export_done, count, count)
@@ -645,13 +658,14 @@ private fun rememberImporter(repo: BookRepository, snackbar: SnackbarHostState):
         scope.launch {
             val res = resources
             val message = try {
-                val input = context.contentResolver.openInputStream(uri) ?: throw IOException("No input stream")
+                val input = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri) }
+                    ?: throw IOException("No input stream")
                 val result = withContext(NonCancellable) { repo.import(input) }
                 if (result.added == 0 && result.skipped == 0 && result.updated == 0) {
                     res.getString(R.string.import_nothing)
                 } else {
                     listOfNotNull(
-                        res.getQuantityString(R.plurals.import_done, result.added, result.added),
+                        result.added.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.import_done, it, it) },
                         result.updated.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.import_updated, it, it) },
                         result.skipped.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.import_skipped, it, it) },
                     ).joinToString(" ")

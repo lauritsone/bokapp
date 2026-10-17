@@ -183,18 +183,21 @@ fun BookDetailScreen(
                 onUseForSuggestions = vm::setUseForSuggestions,
                 onFindDetails = vm::refresh,
                 refreshing = refreshing,
-                extras = DetailExtras(
-                    seriesBooks = seriesBooks,
-                    next = next,
-                    onOpenBook = onOpenBook,
-                    onFindNext = vm::findNext,
-                    onAddNext = { vm.addNext(onOpenBook) },
-                    onSetPage = vm::setProgress,
-                    onSetDates = vm::setDates,
-                    onLend = vm::lend,
-                    onReturned = vm::returned,
-                    onReadAgain = vm::readAgain,
-                ),
+                // Kept between redraws, so the page can skip redrawing when nothing changed.
+                extras = remember(seriesBooks, next, onOpenBook) {
+                    DetailExtras(
+                        seriesBooks = seriesBooks,
+                        next = next,
+                        onOpenBook = onOpenBook,
+                        onFindNext = vm::findNext,
+                        onAddNext = { vm.addNext(onOpenBook) },
+                        onSetPage = vm::setProgress,
+                        onSetDates = vm::setDates,
+                        onLend = vm::lend,
+                        onReturned = vm::returned,
+                        onReadAgain = vm::readAgain,
+                    )
+                },
                 modifier = Modifier.padding(padding).consumeWindowInsets(padding),
             )
         }

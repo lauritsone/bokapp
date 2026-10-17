@@ -28,9 +28,19 @@ interface BookDao {
     @Query("SELECT id, title, authors FROM books")
     suspend fun names(): List<BookName>
 
-    /** Books without a photo whose cover hasn't been looked for yet. */
-    @Query("SELECT * FROM books WHERE photoPath IS NULL AND coverCheckedAt = 0")
+    /**
+     * Books without a photo whose cover hasn't been looked for yet, and that have no cover
+     * or only a guessed one (see [CoverFinder.isGuess]). A real cover needs no check.
+     */
+    @Query(
+        "SELECT * FROM books WHERE photoPath IS NULL AND coverCheckedAt = 0 " +
+            "AND (coverUrl IS NULL OR coverUrl LIKE '%covers.openlibrary.org/b/isbn/%')",
+    )
     suspend fun uncheckedCovers(): List<Book>
+
+    /** The books of a series, in any spelling of its name's case. */
+    @Query("SELECT * FROM books WHERE series = :series COLLATE NOCASE")
+    fun observeSeries(series: String): Flow<List<Book>>
 
     /** Books in the taste profile whose genres were learned before [since] (or never). */
     @Query("SELECT * FROM books WHERE ignoreForSuggestions = 0 AND profiledAt < :since LIMIT :limit")
@@ -48,6 +58,9 @@ interface BookDao {
 
     @Query("UPDATE books SET notes = :notes, updatedAt = :now WHERE id = :id")
     suspend fun setNotes(id: Long, notes: String, now: Long)
+
+    @Query("UPDATE books SET rating = :rating, notes = :notes, updatedAt = :now WHERE id = :id")
+    suspend fun setReview(id: Long, rating: Int, notes: String, now: Long)
 
     /**
      * Moving a book onto Read from another shelf counts as finishing it now; moving it off Read

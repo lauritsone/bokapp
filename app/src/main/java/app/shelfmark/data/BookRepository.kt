@@ -8,6 +8,8 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -22,13 +24,13 @@ import java.io.OutputStream
 
 class BookRepository(
     private val dao: BookDao,
-    private val bookLookup: BookLookup,
     private val filesDir: File,
     cacheDir: File,
 ) {
     val books: Flow<List<Book>> = dao.observeAll()
 
     private val nb = NbCatalog(DiskCache(File(cacheDir, "catalogue"), maxAgeMs = 7L * 24 * 60 * 60 * 1000))
+    private val bookLookup = BookLookup(nb)
     private val ol = OlCatalog()
     private val releaseFinder = ReleaseFinder(dao, nb, ol)
     private val coverFinder = CoverFinder(nb)
@@ -67,7 +69,7 @@ class BookRepository(
     }
 
     private suspend fun repairCoverBatch() {
-        val pending = dao.uncheckedCovers().filter { it.coverUrl == null || CoverFinder.isGuess(it.coverUrl) }
+        val pending = dao.uncheckedCovers()
         val permits = Semaphore(4)
         // Found covers are saved a batch at a time: each write redraws the library, and an
         // import can leave hundreds of books to check.
@@ -79,7 +81,7 @@ class BookRepository(
                         permits.withPermit {
                             val guess = book.coverUrl
                             try {
-                                val cover = if (guess != null && imageExists(guess)) guess else coverFinder.find(book)
+                                val cover = if (guess != null && imageExists(guess)) guess else coverFinder.find(book, guessChecked = guess != null)
                                 found += book to cover
                             } catch (e: IOException) {
                                 // Offline: leave it for the next run.
@@ -95,7 +97,7 @@ class BookRepository(
     }
 
     /** The last search, kept while the app runs so revisiting the page is instant. */
-    var lastReleases: ReleaseResult? = null
+    @Volatile var lastReleases: ReleaseResult? = null
         private set
 
     /** New books scored against the user's taste. @throws java.io.IOException when offline. */
@@ -117,7 +119,8 @@ class BookRepository(
         val existing = c.record.isbn?.let { dao.findByIsbn(it) }?.id
             ?: dao.names().firstOrNull { foldText(it.title) + "|" + foldText(it.authors) == key }?.id
         if (existing != null) return existing
-        save(
+        val kept = lastReleases
+        val id = save(
             Book(
                 title = c.record.title,
                 authors = c.author,
@@ -133,9 +136,14 @@ class BookRepository(
                 coverCheckedAt = System.currentTimeMillis(),
             ),
         )
+        // The added suggestion shows as added; the rest of the list still holds.
+        lastReleases = kept
+        id
     }
 
     fun observe(id: Long): Flow<Book?> = dao.observe(id)
+
+    fun observeSeries(series: String): Flow<List<Book>> = dao.observeSeries(series)
 
     suspend fun get(id: Long): Book? = dao.get(id)
 
@@ -156,23 +164,27 @@ class BookRepository(
             suspend { nb.search(listOfNotNull("\"${title.trim()}\"", name?.let { "\"$it\"" }).joinToString(" "), size = 30, norwegianOnly = false) },
             suspend { ol.search(listOfNotNull("title:\"${title.trim()}\"", name?.let { "author:\"$it\"" }).joinToString(" "), fromYear = 0, limit = 10) },
         )
-        var reached = false
-        val found = sources.flatMap { source ->
-            try {
-                source().also { reached = true }
-            } catch (e: IOException) {
-                emptyList()
-            } catch (e: JSONException) {
-                reached = true
-                emptyList()
-            }
+        // Both catalogues at once; null means it couldn't be reached.
+        val answers = coroutineScope {
+            sources.map { source ->
+                async {
+                    try {
+                        source()
+                    } catch (e: IOException) {
+                        null
+                    } catch (e: JSONException) {
+                        emptyList()
+                    }
+                }
+            }.awaitAll()
         }
-        if (!reached) throw IOException("No catalogue could be reached")
-        found
+        if (answers.all { it == null }) throw IOException("No catalogue could be reached")
+        val key = ReleaseFinder.titleKey(title)
+        answers.flatMap { it.orEmpty() }
             .filter { wanted in foldText(it.title) && (name == null || ReleaseFinder.wroteBy(it, name)) }
             .distinctBy { it.isbn ?: it.id }
             // The exact title before longer ones that contain it, then the newest edition.
-            .sortedWith(compareBy({ ReleaseFinder.titleKey(it.title) != ReleaseFinder.titleKey(title) }, { -(it.year ?: 0) }))
+            .sortedWith(compareBy({ ReleaseFinder.titleKey(it.title) != key }, { -(it.year ?: 0) }))
             .take(20)
     }
 
@@ -220,14 +232,9 @@ class BookRepository(
             }
             return@withContext RefreshResult.NothingNew
         }
-        save(updated)
-        // A blurb or author to go by changes the genres, so they are learned again ([save]
-        // keeps the old ones for an unchanged book).
-        dao.setGenres(id, null, 0)
-        if (retryCover) {
-            dao.setCover(id, updated.coverUrl, 0)
-            repairCovers()
-        }
+        // A blurb or author to go by changes the genres, so they are learned again; one write,
+        // so the library redraws once.
+        save(updated.copy(coverCheckedAt = if (retryCover) 0 else updated.coverCheckedAt), relearn = true)
         lastReleases = null
         RefreshResult.Updated(filled)
     }
@@ -277,8 +284,11 @@ class BookRepository(
         }
     }
 
-    /** Inserts or updates; returns the book's id. */
-    suspend fun save(book: Book): Long {
+    /**
+     * Inserts or updates; returns the book's id. [relearn] looks the genres up again even
+     * when the title and author are unchanged.
+     */
+    suspend fun save(book: Book, relearn: Boolean = false): Long {
         val now = System.currentTimeMillis()
         val previous = if (book.id == 0L) null else dao.get(book.id)
         val previousShelf = previous?.shelf
@@ -302,7 +312,7 @@ class BookRepository(
         // background since then are kept rather than written back over.
         val merged = when {
             previous == null -> book
-            identityChanged -> book.copy(genres = null, profiledAt = 0)
+            identityChanged || relearn -> book.copy(genres = null, profiledAt = 0)
             else -> book.copy(
                 genres = previous.genres,
                 profiledAt = previous.profiledAt,
@@ -353,8 +363,8 @@ class BookRepository(
     suspend fun finish(id: Long) = setShelf(id, Shelf.Read)
 
     suspend fun review(id: Long, rating: Int, notes: String) {
-        setRating(id, rating)
-        setNotes(id, notes.trim())
+        dao.setReview(id, rating.coerceIn(0, 5), notes.trim(), System.currentTimeMillis())
+        lastReleases = null
     }
 
     /** The page the user is on; past the last page counts as the last. */
@@ -399,12 +409,13 @@ class BookRepository(
         } catch (e: JSONException) {
             null
         } ?: return@withContext null
-        val owned = dao.names().firstOrNull { it.id != book.id && ReleaseFinder.titleKey(it.title) == ReleaseFinder.titleKey(next) }
+        val nextKey = ReleaseFinder.titleKey(next)
+        val owned = dao.names().firstOrNull { it.id != book.id && ReleaseFinder.titleKey(it.title) == nextKey }
             ?.let { dao.get(it.id) }
         if (owned != null) return@withContext NextInSeries(next, owned = owned, record = null)
         // The edition to add: the same author's, newest first, Norwegian when there is one.
         val editions = nb.search(listOfNotNull("\"$next\"", author?.let { "\"$it\"" }).joinToString(" "), size = 20, norwegianOnly = false)
-            .filter { ReleaseFinder.titleKey(it.title) == ReleaseFinder.titleKey(next) && (author == null || ReleaseFinder.wroteBy(it, author)) }
+            .filter { ReleaseFinder.titleKey(it.title) == nextKey && (author == null || ReleaseFinder.wroteBy(it, author)) }
         val edition = editions.sortedWith(compareBy({ it.language != "nob" }, { it.isbn == null }, { -(it.year ?: 0) })).firstOrNull()
         NextInSeries(next, owned = null, record = edition)
     }

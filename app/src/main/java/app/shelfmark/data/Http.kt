@@ -1,5 +1,9 @@
 package app.shelfmark.data
 
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -9,17 +13,34 @@ import java.security.MessageDigest
 private const val USER_AGENT = "Shelfmark/1.0 (Android reading log)"
 
 /** GETs [url] as text. @throws IOException on network errors or a non-2xx answer. */
-internal fun httpGet(url: String, timeoutMs: Int = 10_000): String {
+internal suspend fun httpGet(url: String, timeoutMs: Int = 10_000): String {
     val conn = URL(url).openConnection() as HttpURLConnection
     conn.connectTimeout = timeoutMs
     conn.readTimeout = timeoutMs + 5_000
     conn.setRequestProperty("User-Agent", USER_AGENT)
-    try {
+    return cancellable(conn) {
         val code = conn.responseCode
         if (code !in 200..299) throw IOException("HTTP $code from $url")
-        return conn.inputStream.bufferedReader().use { it.readText() }
+        conn.inputStream.bufferedReader().use { it.readText() }
+    }
+}
+
+/**
+ * Runs the blocking [block] on [conn], dropping the connection as soon as the caller is
+ * cancelled (the user left the screen), rather than holding a thread until the timeout.
+ */
+private suspend fun <T> cancellable(conn: HttpURLConnection, block: () -> T): T = coroutineScope {
+    val watcher = launch {
+        try {
+            awaitCancellation()
+        } finally {
+            conn.disconnect()
+        }
+    }
+    try {
+        runInterruptible { block() }
     } finally {
-        conn.disconnect()
+        watcher.cancel()
     }
 }
 
@@ -28,7 +49,7 @@ internal fun httpGet(url: String, timeoutMs: Int = 10_000): String {
  * have no cover, so a cover link is only kept after this check.
  * @throws IOException if the server can't be reached at all.
  */
-internal fun imageExists(url: String): Boolean {
+internal suspend fun imageExists(url: String): Boolean {
     // Only the headers are needed; the image itself is fetched once, when it is shown.
     val head = imageCheck(url, "HEAD")
     // A few servers don't answer HEAD; ask for the image itself then.
@@ -36,20 +57,21 @@ internal fun imageExists(url: String): Boolean {
 }
 
 /** Whether [url] answers [method] with an image; null if the server doesn't accept the method. */
-private fun imageCheck(url: String, method: String): Boolean? {
+private suspend fun imageCheck(url: String, method: String): Boolean? {
     val conn = URL(url).openConnection() as HttpURLConnection
     conn.requestMethod = method
     conn.connectTimeout = 8_000
     conn.readTimeout = 8_000
     conn.instanceFollowRedirects = true
     conn.setRequestProperty("User-Agent", USER_AGENT)
-    try {
+    return cancellable(conn) {
         val code = conn.responseCode
-        if (method == "HEAD" && (code == 405 || code == 501)) return null
-        // A HEAD answer often has no length (-1); only an empty image (0) says there is none.
-        return code in 200..299 && conn.contentType.orEmpty().startsWith("image/") && conn.contentLength != 0
-    } finally {
-        conn.disconnect()
+        if (method == "HEAD" && (code == 405 || code == 501)) {
+            null
+        } else {
+            // A HEAD answer often has no length (-1); only an empty image (0) says there is none.
+            code in 200..299 && conn.contentType.orEmpty().startsWith("image/") && conn.contentLength != 0
+        }
     }
 }
 
@@ -60,7 +82,7 @@ private fun imageCheck(url: String, method: String): Boolean? {
 class DiskCache internal constructor(private val dir: File, private val maxAgeMs: Long) {
 
     /** The cached answer for [url], or [httpGet]'s, which is then kept. */
-    fun get(url: String, timeoutMs: Int = 10_000): String {
+    suspend fun get(url: String, timeoutMs: Int = 10_000): String {
         val file = File(dir, sha1(url))
         if (file.isFile && System.currentTimeMillis() - file.lastModified() < maxAgeMs) {
             try {
@@ -92,6 +114,17 @@ class DiskCache internal constructor(private val dir: File, private val maxAgeMs
         dir.listFiles()?.filter { now - it.lastModified() >= maxAgeMs }?.forEach { it.delete() }
     }
 
-    private fun sha1(s: String) = MessageDigest.getInstance("SHA-1").digest(s.toByteArray())
-        .joinToString("") { "%02x".format(it) }
+    private fun sha1(s: String): String {
+        val bytes = MessageDigest.getInstance("SHA-1").digest(s.toByteArray())
+        val out = CharArray(bytes.size * 2)
+        bytes.forEachIndexed { i, b ->
+            out[i * 2] = HEX[(b.toInt() shr 4) and 0xf]
+            out[i * 2 + 1] = HEX[b.toInt() and 0xf]
+        }
+        return String(out)
+    }
+
+    private companion object {
+        const val HEX = "0123456789abcdef"
+    }
 }

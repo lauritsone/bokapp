@@ -81,53 +81,54 @@ object LibraryExport {
     }
 
     private fun writeJson(books: List<Book>, out: OutputStream, photos: Map<Long, String> = emptyMap()) {
-        val array = JSONArray()
-        for (b in books) {
-            array.put(
-                JSONObject()
-                    .put("title", b.title)
-                    .put("authors", b.authors)
-                    .put("shelf", b.shelf.key)
-                    .put("rating", b.rating)
-                    .put("notes", b.notes)
-                    .putOpt("isbn", b.isbn)
-                    .putOpt("publisher", b.publisher)
-                    .putOpt("publishedDate", b.publishedDate)
-                    .putOpt("pageCount", b.pageCount)
-                    .putOpt("description", b.description)
-                    .putOpt("coverUrl", b.coverUrl)
-                    .put("addedAt", Instant.ofEpochMilli(b.addedAt).toString())
-                    .put("updatedAt", Instant.ofEpochMilli(b.updatedAt).toString())
-                    .putOpt("finishedAt", b.finishedAt?.let { Instant.ofEpochMilli(it).toString() })
-                    .put("ignoreForSuggestions", b.ignoreForSuggestions)
-                    .putOpt("startedAt", b.startedAt?.let { Instant.ofEpochMilli(it).toString() })
-                    .putOpt("currentPage", b.currentPage)
-                    .putOpt("series", b.series)
-                    .putOpt("seriesNumber", b.seriesNumber)
-                    .put("format", b.format.key)
-                    .put("rereads", b.rereads)
-                    .putOpt("lentTo", b.lentTo)
-                    .putOpt("lentAt", b.lentAt?.let { Instant.ofEpochMilli(it).toString() })
-                    .putOpt("tags", b.tagList().takeIf { it.isNotEmpty() }?.let { JSONArray(it) })
-                    // Saves looking the genres up again after a restore.
-                    .putOpt("genres", b.genres)
-                    .putOpt("photo", photos[b.id]),
-            )
-        }
-        val root = JSONObject()
-            .put("app", "Shelfmark")
-            .put("formatVersion", 2)
-            .put("exportedAt", Instant.now().toString())
-            .put("books", array)
         val writer = out.bufferedWriter(Charsets.UTF_8)
-        writer.write(root.toString(2))
+        // Written a book at a time, so a large library is never one huge string in memory.
+        writer.write("{\n\"app\": \"Shelfmark\",\n\"formatVersion\": 2,\n")
+        writer.write("\"exportedAt\": " + JSONObject.quote(Instant.now().toString()) + ",\n\"books\": [\n")
+        books.forEachIndexed { i, b ->
+            if (i > 0) writer.write(",\n")
+            writer.write(bookJson(b, photos).toString(2))
+        }
+        writer.write("\n]\n}\n")
         writer.flush()
     }
+
+    private fun bookJson(b: Book, photos: Map<Long, String>): JSONObject =
+        JSONObject()
+            .put("title", b.title)
+            .put("authors", b.authors)
+            .put("shelf", b.shelf.key)
+            .put("rating", b.rating)
+            .put("notes", b.notes)
+            .putOpt("isbn", b.isbn)
+            .putOpt("publisher", b.publisher)
+            .putOpt("publishedDate", b.publishedDate)
+            .putOpt("pageCount", b.pageCount)
+            .putOpt("description", b.description)
+            .putOpt("coverUrl", b.coverUrl)
+            .put("addedAt", Instant.ofEpochMilli(b.addedAt).toString())
+            .put("updatedAt", Instant.ofEpochMilli(b.updatedAt).toString())
+            .putOpt("finishedAt", b.finishedAt?.let { Instant.ofEpochMilli(it).toString() })
+            .put("ignoreForSuggestions", b.ignoreForSuggestions)
+            .putOpt("startedAt", b.startedAt?.let { Instant.ofEpochMilli(it).toString() })
+            .putOpt("currentPage", b.currentPage)
+            .putOpt("series", b.series)
+            .putOpt("seriesNumber", b.seriesNumber)
+            .put("format", b.format.key)
+            .put("rereads", b.rereads)
+            .putOpt("lentTo", b.lentTo)
+            .putOpt("lentAt", b.lentAt?.let { Instant.ofEpochMilli(it).toString() })
+            .putOpt("tags", b.tagList().takeIf { it.isNotEmpty() }?.let { JSONArray(it) })
+            // Saves looking the genres up again after a restore.
+            .putOpt("genres", b.genres)
+            .putOpt("photo", photos[b.id])
 
     /** Local date and time to the second, so books added the same day keep their order. */
     private fun localTime(epochMillis: Long) =
         Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
-            .truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            .truncatedTo(ChronoUnit.SECONDS).format(localTimeFormat)
+
+    private val localTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
     /** Quotes a field when it holds a comma, quote or line break (RFC 4180). */
     private fun csvField(value: String): String =

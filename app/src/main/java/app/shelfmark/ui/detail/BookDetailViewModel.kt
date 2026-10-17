@@ -6,9 +6,12 @@ import app.shelfmark.data.Book
 import app.shelfmark.data.BookRepository
 import app.shelfmark.data.NextInSeries
 import app.shelfmark.data.RefreshResult
-import app.shelfmark.data.foldText
 import app.shelfmark.data.seriesOrder
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.shareIn
 import app.shelfmark.data.Shelf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,11 +27,14 @@ class BookDetailViewModel(
     private val id: Long,
 ) : ViewModel() {
 
-    val book: StateFlow<Book?> = repo.observe(id)
+    // One database query for both the book and whether it is missing.
+    private val observed = repo.observe(id).shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
+
+    val book: StateFlow<Book?> = observed
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** True once it's known there is no such book (removed elsewhere), as opposed to still loading. */
-    val missing: StateFlow<Boolean> = repo.observe(id).map { it == null }
+    val missing: StateFlow<Boolean> = observed.map { it == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun setRating(rating: Int) {
@@ -98,11 +104,19 @@ class BookDetailViewModel(
     }
 
     /** The other books of this book's series in the library, in series order (this one included). */
-    val seriesBooks: StateFlow<List<Book>> = combine(book, repo.books) { current, all ->
-        val series = current?.series?.let(::foldText) ?: return@combine emptyList()
-        all.filter { it.series?.let(::foldText) == series }
-            .sortedWith(compareBy({ it.seriesOrder() }, { it.publishedDate ?: "" }, { it.addedAt }))
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    // Only the series' own books are read, and only again when the series changes.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val seriesBooks: StateFlow<List<Book>> = book.map { it?.series }.distinctUntilChanged()
+        .flatMapLatest { series ->
+            if (series == null) {
+                flowOf(emptyList())
+            } else {
+                repo.observeSeries(series).map { books ->
+                    books.sortedWith(compareBy({ it.seriesOrder() }, { it.publishedDate ?: "" }, { it.addedAt }))
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setProgress(page: Int?) {
         viewModelScope.launch { repo.setProgress(id, page) }

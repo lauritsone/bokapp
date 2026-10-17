@@ -3,7 +3,6 @@ package app.shelfmark
 import android.app.Application
 import androidx.room.Room
 import app.shelfmark.data.AppDatabase
-import app.shelfmark.data.BookLookup
 import app.shelfmark.data.BookRepository
 
 class ShelfmarkApp : Application() {
@@ -14,7 +13,7 @@ class ShelfmarkApp : Application() {
     }
 
     val repository by lazy {
-        BookRepository(database.bookDao(), BookLookup(), filesDir, cacheDir)
+        BookRepository(database.bookDao(), filesDir, cacheDir)
     }
 
     override fun onCreate() {
