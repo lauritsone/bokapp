@@ -41,8 +41,8 @@ Everything is stored on the phone.
 
 ## Open and run
 
-1. Open this folder in **Android Studio Ladybug (2024.2) or newer**.
-2. Let Gradle sync (it downloads Gradle 8.11.1, AGP 8.7.3 and the libraries).
+1. Open this folder in **Android Studio Narwhal 3 Feature Drop (2025.1.3) or newer**.
+2. Let Gradle sync (it downloads Gradle 8.14.6, AGP 8.13.2 and the libraries; the app compiles against Android 16, API 36).
 3. Run on a device with a camera (Android 8.0 / API 26 or newer). An emulator works for everything except real barcode scanning.
 
 ## Design
@@ -80,7 +80,7 @@ app/src/main/java/app/shelfmark/
 
 ## Tech stack
 
-Kotlin 2.0, Jetpack Compose with Material 3, Room, CameraX 1.4, ML Kit Barcode Scanning (bundled model, so it works offline), Coil and Navigation Compose. There's no DI framework: `ShelfmarkApp` holds the single repository.
+Kotlin 2.3, Jetpack Compose with Material 3, Room 2.8, CameraX 1.6, ML Kit Barcode Scanning (bundled model, so it works offline), Coil and Navigation Compose. There's no DI framework: `ShelfmarkApp` holds the single repository.
 
 ## Ideas for next steps
 

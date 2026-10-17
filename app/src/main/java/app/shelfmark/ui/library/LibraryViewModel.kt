@@ -58,7 +58,7 @@ const val LENT_FILTER = "\u0001lent"
 class LibraryViewModel(
     private val repo: BookRepository,
     // Kept so the shelf, search, sort and filter survive Android closing the app in the background.
-    private val saved: SavedStateHandle = SavedStateHandle(),
+    private val saved: SavedStateHandle,
 ) : ViewModel() {
     val query: StateFlow<String> = saved.getStateFlow("query", "")
     private val sort = saved.getStateFlow("sort", SortMode.Recent.name)

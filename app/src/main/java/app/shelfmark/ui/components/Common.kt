@@ -2,9 +2,9 @@ package app.shelfmark.ui.components
 
 import java.util.Locale
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.rounded.Headphones
-import androidx.compose.material.icons.rounded.TabletAndroid
+import app.shelfmark.ui.icons.MenuBook
+import app.shelfmark.ui.icons.Headphones
+import app.shelfmark.ui.icons.TabletAndroid
 import androidx.compose.ui.graphics.vector.ImageVector
 import app.shelfmark.R
 import app.shelfmark.data.BookFormat

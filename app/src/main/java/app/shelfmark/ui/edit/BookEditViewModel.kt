@@ -47,7 +47,7 @@ class BookEditViewModel(
     isbn: String?,
     photoPath: String?,
     shelf: Shelf,
-    private val saved: SavedStateHandle = SavedStateHandle(),
+    private val saved: SavedStateHandle,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditState(book = Book(isbn = isbn, photoPath = photoPath, shelf = shelf)))

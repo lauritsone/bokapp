@@ -1,9 +1,9 @@
 package app.shelfmark.ui.library
 
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.AutoAwesome
+import app.shelfmark.ui.icons.AutoAwesome
 import app.shelfmark.data.ImportException
-import androidx.compose.material.icons.rounded.FileUpload
+import app.shelfmark.ui.icons.FileUpload
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import app.shelfmark.ui.components.icon
 import app.shelfmark.ui.components.colors
@@ -24,6 +24,7 @@ import app.shelfmark.data.LibraryExport
 import app.shelfmark.data.ExportFormat
 import app.shelfmark.data.BookRepository
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,7 +37,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.FileDownload
+import app.shelfmark.ui.icons.FileDownload
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.net.Uri
@@ -70,7 +71,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.QrCodeScanner
+import app.shelfmark.ui.icons.QrCodeScanner
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -100,8 +101,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
-import androidx.compose.material.icons.rounded.Handshake
-import androidx.compose.material.icons.rounded.Sell
+import app.shelfmark.ui.icons.Handshake
+import app.shelfmark.ui.icons.Sell
 import androidx.compose.material3.LinearProgressIndicator
 import app.shelfmark.data.BookFormat
 import app.shelfmark.data.foldText
@@ -591,6 +592,7 @@ private fun LibraryMenu(
 @Composable
 private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState): (ExportFormat) -> Unit {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
 
     fun saveTo(format: ExportFormat, uri: Uri?) {
@@ -600,11 +602,11 @@ private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState):
                 val out = context.contentResolver.openOutputStream(uri) ?: throw IOException("No output stream")
                 // Finishes even if the screen goes away (rotation, opening a book) part way.
                 val count = withContext(NonCancellable) { repo.export(format, out) }
-                context.resources.getQuantityString(R.plurals.export_done, count, count)
+                resources.getQuantityString(R.plurals.export_done, count, count)
             } catch (e: IOException) {
-                context.getString(R.string.export_failed)
+                resources.getString(R.string.export_failed)
             } catch (e: SecurityException) {
-                context.getString(R.string.export_failed)
+                resources.getString(R.string.export_failed)
             }
             snackbar.showSnackbar(message)
         }
@@ -636,11 +638,12 @@ private val ImportMimeTypes = arrayOf(
 @Composable
 private fun rememberImporter(repo: BookRepository, snackbar: SnackbarHostState): () -> Unit {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val launcher = rememberLauncherForActivityResult(OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val res = context.resources
+            val res = resources
             val message = try {
                 val input = context.contentResolver.openInputStream(uri) ?: throw IOException("No input stream")
                 val result = withContext(NonCancellable) { repo.import(input) }

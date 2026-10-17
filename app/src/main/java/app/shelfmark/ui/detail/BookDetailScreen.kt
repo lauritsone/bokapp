@@ -29,7 +29,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.DeleteOutline
+import app.shelfmark.ui.icons.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,7 +39,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import app.shelfmark.data.RefreshResult
 import app.shelfmark.data.tagList
 import app.shelfmark.ui.components.formatLabel
@@ -107,12 +107,12 @@ fun BookDetailScreen(
     val missing by vm.missing.collectAsStateWithLifecycle()
     val seriesBooks by vm.seriesBooks.collectAsStateWithLifecycle()
     val next by vm.next.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(refreshResult, offline) {
         val result = refreshResult
         if (result == null && !offline) return@LaunchedEffect
-        val res = context.resources
+        val res = resources
         val message = when (result) {
             is RefreshResult.Updated -> res.getQuantityString(R.plurals.refresh_updated, result.filled, result.filled)
             RefreshResult.NothingNew -> res.getString(R.string.refresh_nothing_new)

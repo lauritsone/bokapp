@@ -1,0 +1,6 @@
+# Shelfmark's own code, compiled ahead of time on install so the first launch and the first
+# scroll through the library don't wait on the JIT. Compose and the other libraries bring
+# their own profiles; profileinstaller installs them all on phones without Google Play.
+# Written by hand (no device to record one on), so it covers the whole app, which is small.
+HSPLapp/shelfmark/**->**(**)**
+Lapp/shelfmark/**;
