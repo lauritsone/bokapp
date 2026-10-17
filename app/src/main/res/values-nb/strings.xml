@@ -274,4 +274,17 @@
     <string name="lent_to_since">Lånt ut til %1$s siden %2$s</string>
     <string name="returned">Merk som levert</string>
     <string name="lent_out_count">Utlånt (%1$d)</string>
+
+    <!-- Tilbakemelding og angre -->
+    <string name="undo">Angre</string>
+    <string name="open">Åpne</string>
+    <string name="moved_to_shelf">Flyttet til «%1$s»</string>
+    <string name="rating_removed">Vurderingen er fjernet</string>
+    <string name="marked_returned">Merket som levert</string>
+    <string name="date_cleared">Datoen er fjernet</string>
+    <string name="removed_book">«%1$s» er fjernet</string>
+    <string name="discard_title">Vil du forkaste endringene?</string>
+    <string name="discard_body">Det du har skrevet inn eller slått opp for denne boken, blir ikke lagret.</string>
+    <string name="discard">Forkast</string>
+    <string name="keep_editing">Fortsett å redigere</string>
 </resources>

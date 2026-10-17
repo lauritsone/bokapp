@@ -37,7 +37,9 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
+import app.shelfmark.ui.components.label
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalResources
 import app.shelfmark.data.RefreshResult
@@ -157,6 +159,28 @@ fun BookDetailScreen(
         if (choice == SnackbarResult.ActionPerformed) onEdit()
     }
 
+    val change by vm.change.collectAsStateWithLifecycle()
+    LaunchedEffect(change) {
+        val c = change ?: return@LaunchedEffect
+        val message = when (c) {
+            is DetailChange.Moved -> resources.getString(R.string.moved_to_shelf, resources.getString(c.shelf.label))
+            is DetailChange.RatingRemoved -> resources.getString(R.string.rating_removed)
+            is DetailChange.Returned -> resources.getString(R.string.marked_returned)
+            is DetailChange.DateCleared -> resources.getString(R.string.date_cleared)
+        }
+        val choice = snackbar.showSnackbar(message, actionLabel = resources.getString(R.string.undo), duration = SnackbarDuration.Short)
+        vm.changeShown()
+        if (choice == SnackbarResult.ActionPerformed) vm.undo(c)
+    }
+
+    // Notes being written are saved on the way out rather than lost.
+    var unsavedNotes by remember { mutableStateOf<String?>(null) }
+    val leave = {
+        unsavedNotes?.let(vm::saveNotes)
+        onBack()
+    }
+    BackHandler(enabled = unsavedNotes != null, onBack = leave)
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
@@ -164,7 +188,7 @@ fun BookDetailScreen(
         topBar = {
             ShelfmarkTopBar(
                 title = book?.title?.takeIf { coverGone },
-                onBack = onBack,
+                onBack = leave,
                 scrollBehavior = scrollBehavior,
                 actions = {
                     IconButton(onClick = vm::refresh, enabled = book != null && !refreshing) {
@@ -219,6 +243,7 @@ fun BookDetailScreen(
                 onShelf = vm::setShelf,
                 onFinish = vm::finish,
                 onSaveNotes = vm::saveNotes,
+                onNotesDraft = { unsavedNotes = it },
                 onUseForSuggestions = vm::setUseForSuggestions,
                 onFindDetails = vm::refresh,
                 refreshing = refreshing,
@@ -291,6 +316,7 @@ private fun DetailContent(
     onShelf: (Shelf) -> Unit,
     onFinish: () -> Unit,
     onSaveNotes: (String) -> Unit,
+    onNotesDraft: (String?) -> Unit,
     onUseForSuggestions: (Boolean) -> Unit,
     onFindDetails: () -> Unit,
     refreshing: Boolean,
@@ -377,7 +403,7 @@ private fun DetailContent(
         // Notes written before the book went back to another shelf stay visible.
         if (book.shelf == Shelf.Read || book.notes.isNotBlank()) {
             Spacer(Modifier.height(Dimens.sectionGap))
-            NotesSection(book.notes, onSaveNotes)
+            NotesSection(book.notes, onSaveNotes, onNotesDraft)
         }
 
         book.description?.let { DescriptionSection(it) }
@@ -491,9 +517,12 @@ private fun SuggestionsToggle(use: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun NotesSection(notes: String, onSave: (String) -> Unit) {
+private fun NotesSection(notes: String, onSave: (String) -> Unit, onDraft: (String?) -> Unit) {
     var editing by rememberSaveable { mutableStateOf(false) }
     var draft by rememberSaveable(notes) { mutableStateOf(notes) }
+    // Tells the page about text not saved yet, so leaving the page can save it.
+    val unsaved = draft.trim().takeIf { editing && it != notes }
+    LaunchedEffect(unsaved) { onDraft(unsaved) }
 
     SectionTitle(
         stringResource(R.string.your_notes),

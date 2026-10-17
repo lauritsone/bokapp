@@ -37,7 +37,24 @@ class BookDetailViewModel(
     val missing: StateFlow<Boolean> = observed.map { it == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    private val _change = MutableStateFlow<DetailChange?>(null)
+
+    /** A change just made, which the page offers to undo, until it has been shown. */
+    val change: StateFlow<DetailChange?> = _change.asStateFlow()
+
+    fun changeShown() {
+        _change.value = null
+    }
+
+    /** Puts the reading log back as it was before [change]. */
+    fun undo(change: DetailChange) {
+        viewModelScope.launch { repo.undo(change.before) }
+    }
+
     fun setRating(rating: Int) {
+        val before = book.value
+        // Tapping the current star clears the rating, easily by mistake.
+        if (before != null && rating == 0 && before.rating > 0) _change.value = DetailChange.RatingRemoved(before)
         viewModelScope.launch { repo.setRating(id, rating) }
     }
 
@@ -46,20 +63,34 @@ class BookDetailViewModel(
     /** True right after the book was finished, to ask for a rating and review. */
     val askForReview: StateFlow<Boolean> = _askForReview.asStateFlow()
 
+    /** The book as it was before it was finished, offered back once the review sheet closes. */
+    private var beforeFinish: Book? = null
+
     fun setShelf(shelf: Shelf) {
-        if (shelf == Shelf.Read && book.value?.shelf != Shelf.Read) _askForReview.value = true
+        val before = book.value ?: return
+        if (shelf == before.shelf) return
+        if (shelf == Shelf.Read) {
+            beforeFinish = before
+            _askForReview.value = true
+        } else {
+            _change.value = DetailChange.Moved(shelf, before)
+        }
         viewModelScope.launch { repo.setShelf(id, shelf) }
     }
 
     fun finish() = setShelf(Shelf.Read)
 
     fun review(rating: Int, notes: String) {
-        _askForReview.value = false
+        reviewDone()
         viewModelScope.launch { repo.review(id, rating, notes) }
     }
 
-    fun skipReview() {
+    fun skipReview() = reviewDone()
+
+    private fun reviewDone() {
         _askForReview.value = false
+        beforeFinish?.let { _change.value = DetailChange.Moved(Shelf.Read, it) }
+        beforeFinish = null
     }
 
     fun setUseForSuggestions(use: Boolean) {
@@ -123,6 +154,10 @@ class BookDetailViewModel(
     }
 
     fun setDates(startedAt: Long?, finishedAt: Long?) {
+        val before = book.value
+        if (before != null && (before.startedAt != null && startedAt == null || before.finishedAt != null && finishedAt == null)) {
+            _change.value = DetailChange.DateCleared(before)
+        }
         viewModelScope.launch { repo.setDates(id, startedAt, finishedAt) }
     }
 
@@ -131,10 +166,12 @@ class BookDetailViewModel(
     }
 
     fun returned() {
+        book.value?.let { _change.value = DetailChange.Returned(it) }
         viewModelScope.launch { repo.returned(id) }
     }
 
     fun readAgain() {
+        book.value?.let { _change.value = DetailChange.Moved(Shelf.Reading, it) }
         viewModelScope.launch { repo.readAgain(id) }
     }
 
@@ -188,4 +225,14 @@ sealed interface NextState {
     /** The catalogue doesn't say which book comes next. */
     data object Unknown : NextState
     data object Offline : NextState
+}
+
+/** A change made with one tap on the book's page; [before] is the book as it was. */
+sealed interface DetailChange {
+    val before: Book
+
+    data class Moved(val shelf: Shelf, override val before: Book) : DetailChange
+    data class RatingRemoved(override val before: Book) : DetailChange
+    data class Returned(override val before: Book) : DetailChange
+    data class DateCleared(override val before: Book) : DetailChange
 }

@@ -279,4 +279,17 @@
     <string name="lent_to_since">Lent to %1$s since %2$s</string>
     <string name="returned">Mark as returned</string>
     <string name="lent_out_count">Lent out (%1$d)</string>
+
+    <!-- Feedback and undo -->
+    <string name="undo">Undo</string>
+    <string name="open">Open</string>
+    <string name="moved_to_shelf">Moved to %1$s</string>
+    <string name="rating_removed">Rating removed</string>
+    <string name="marked_returned">Marked as returned</string>
+    <string name="date_cleared">Date cleared</string>
+    <string name="removed_book">Removed “%1$s”</string>
+    <string name="discard_title">Discard your changes?</string>
+    <string name="discard_body">What you’ve typed or looked up for this book won’t be saved.</string>
+    <string name="discard">Discard</string>
+    <string name="keep_editing">Keep editing</string>
 </resources>

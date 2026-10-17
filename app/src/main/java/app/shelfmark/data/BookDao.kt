@@ -133,6 +133,30 @@ interface BookDao {
     )
     suspend fun readAgain(id: Long, now: Long)
 
+    /** Puts the reading log of a book back as it was, for Undo. Details and covers are left alone. */
+    @Query(
+        "UPDATE books SET shelf = :shelf, rating = :rating, notes = :notes, startedAt = :startedAt, " +
+            "finishedAt = :finishedAt, currentPage = :currentPage, rereads = :rereads, lentTo = :lentTo, " +
+            "lentAt = :lentAt, updatedAt = :now WHERE id = :id",
+    )
+    suspend fun restoreLog(
+        id: Long,
+        shelf: Shelf,
+        rating: Int,
+        notes: String,
+        startedAt: Long?,
+        finishedAt: Long?,
+        currentPage: Int?,
+        rereads: Int,
+        lentTo: String?,
+        lentAt: Long?,
+        now: Long,
+    )
+
+    /** Every cover photo a book uses. */
+    @Query("SELECT photoPath FROM books WHERE photoPath IS NOT NULL")
+    suspend fun photoPaths(): List<String>
+
     @Delete
     suspend fun delete(book: Book)
 }

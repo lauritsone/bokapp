@@ -40,7 +40,17 @@ data class EditState(
     /** Editions found by title; null when no search has been made. */
     val results: List<CatalogRecord>? = null,
     val searching: Boolean = false,
-)
+    /** The book as it was when the screen opened; null while it is loading. */
+    val baseline: Book? = null,
+) {
+    /**
+     * Whether leaving now would lose something: a change, a looked-up book or a new cover
+     * photo. Not once the book is being saved.
+     */
+    val unsaved: Boolean
+        get() = !saving && baseline != null &&
+            (book != baseline || (book.id == 0L && book.photoPath != null))
+}
 
 class BookEditViewModel(
     private val repo: BookRepository,
@@ -51,7 +61,9 @@ class BookEditViewModel(
     private val saved: SavedStateHandle,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(EditState(book = Book(isbn = isbn, photoPath = photoPath, shelf = shelf)))
+    private val _state = MutableStateFlow(
+        Book(isbn = isbn, photoPath = photoPath, shelf = shelf).let { EditState(book = it, baseline = it.takeIf { bookId == 0L }) },
+    )
     val state: StateFlow<EditState> = _state.asStateFlow()
 
     init {
@@ -61,13 +73,13 @@ class BookEditViewModel(
                 // Back after Android closed the app in the background: the form as the user left it.
                 draft != null -> {
                     val base = if (bookId != 0L) repo.get(bookId) ?: Book(id = bookId) else _state.value.book
-                    _state.update { it.copy(book = base.withDraft(draft)) }
+                    _state.update { it.copy(book = base.withDraft(draft), baseline = base) }
                 }
                 bookId != 0L -> {
                     // The form stays hidden until the book is loaded, so nothing typed is overwritten.
                     _state.update { it.copy(loading = true) }
                     val existing = repo.get(bookId)
-                    _state.update { s -> s.copy(loading = false, book = existing ?: s.book) }
+                    _state.update { s -> s.copy(loading = false, book = existing ?: s.book, baseline = existing ?: s.book) }
                 }
                 isbn != null -> fetch(isbn)
             }

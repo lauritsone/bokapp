@@ -20,5 +20,6 @@ class ShelfmarkApp : Application() {
         super.onCreate()
         // Fill in covers that earlier imports or lookups couldn't find.
         repository.repairCovers()
+        repository.cleanUpInBackground()
     }
 }

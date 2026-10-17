@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
@@ -549,10 +550,50 @@ class BookRepository(
 
     private fun nameKey(book: Book) = foldText(book.title) + "|" + foldText(book.authors)
 
+    /** The book removed last, until the library has offered to undo it. */
+    val lastRemoved = MutableStateFlow<Book?>(null)
+
+    /**
+     * Removes the book. Its cover photo stays until the next start, so Undo can bring the
+     * book back whole (see [deleteUnusedPhotos]).
+     */
     suspend fun delete(book: Book) {
         dao.delete(book)
         lastReleases = null
-        book.photoPath?.let { path -> withContext(Dispatchers.IO) { File(path).delete() } }
+        lastRemoved.value = book
+    }
+
+    /** Runs [deleteUnusedPhotos] in the background. */
+    fun cleanUpInBackground() {
+        background.launch { deleteUnusedPhotos() }
+    }
+
+    /** Brings a removed book back, as it was. */
+    suspend fun restore(book: Book) {
+        dao.upsert(book)
+        lastReleases = null
+        repairCovers()
+    }
+
+    /** Undoes a change to the reading log (shelf, rating, dates, lending …), back to [before]. */
+    suspend fun undo(before: Book) {
+        dao.restoreLog(
+            before.id, before.shelf, before.rating, before.notes, before.startedAt, before.finishedAt,
+            before.currentPage, before.rereads, before.lentTo, before.lentAt, System.currentTimeMillis(),
+        )
+        lastReleases = null
+    }
+
+    /**
+     * Deletes cover photos no book uses: those of removed books, and of new books that were
+     * never saved. A photo from the last day is kept, as its book may still be on the edit screen.
+     */
+    suspend fun deleteUnusedPhotos() = withContext(Dispatchers.IO) {
+        val used = dao.photoPaths().toSet()
+        val cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000
+        File(filesDir, "covers").listFiles()
+            ?.filter { it.absolutePath !in used && it.lastModified() < cutoff }
+            ?.forEach { it.delete() }
     }
 
     /** A fresh file in app-private storage for a cover photo. */

@@ -220,4 +220,20 @@ class LibraryViewModel(
     fun skipReview() {
         _justFinished.value = null
     }
+
+    /** Puts a book finished by mistake back as it was. */
+    fun undoFinish(before: Book) {
+        viewModelScope.launch { repo.undo(before) }
+    }
+
+    /** A book just removed on its page, for the library to offer back. */
+    val removed: StateFlow<Book?> = repo.lastRemoved
+
+    fun removedShown() {
+        repo.lastRemoved.value = null
+    }
+
+    fun restore(book: Book) {
+        viewModelScope.launch { repo.restore(book) }
+    }
 }

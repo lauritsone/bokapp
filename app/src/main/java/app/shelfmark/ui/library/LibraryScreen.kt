@@ -34,6 +34,9 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
@@ -146,18 +149,41 @@ fun LibraryScreen(
     val import = rememberImporter(repo, snackbar)
     val justFinished by vm.justFinished.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val movedToRead = stringResource(R.string.moved_to_read, justFinished?.title.orEmpty())
+    val resources = LocalResources.current
 
     justFinished?.let { book ->
         fun done(review: () -> Unit) {
             review()
-            scope.launch { snackbar.showSnackbar(movedToRead) }
+            // Finished by mistake: Undo puts it back on its shelf, without the new rating.
+            scope.launch {
+                val choice = snackbar.showSnackbar(
+                    resources.getString(R.string.moved_to_read, book.title),
+                    actionLabel = resources.getString(R.string.undo),
+                    duration = SnackbarDuration.Short,
+                )
+                if (choice == SnackbarResult.ActionPerformed) vm.undoFinish(book)
+            }
         }
         FinishSheet(
             book,
             onSave = { rating, notes -> done { vm.review(rating, notes) } },
             onSkip = { done(vm::skipReview) },
         )
+    }
+
+    val removed by vm.removed.collectAsStateWithLifecycle()
+    LaunchedEffect(removed) {
+        val book = removed ?: return@LaunchedEffect
+        try {
+            val choice = snackbar.showSnackbar(
+                resources.getString(R.string.removed_book, book.title),
+                actionLabel = resources.getString(R.string.undo),
+                duration = SnackbarDuration.Long,
+            )
+            if (choice == SnackbarResult.ActionPerformed) vm.restore(book)
+        } finally {
+            vm.removedShown()
+        }
     }
 
     Scaffold(

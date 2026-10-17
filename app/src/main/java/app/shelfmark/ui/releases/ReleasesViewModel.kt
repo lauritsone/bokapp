@@ -44,12 +44,22 @@ class ReleasesViewModel(private val repo: BookRepository) : ViewModel() {
         }
     }
 
+    private val _justAdded = MutableStateFlow<Long?>(null)
+
+    /** The id of the book just put on Want to read, until the page has said so. */
+    val justAdded: StateFlow<Long?> = _justAdded.asStateFlow()
+
+    fun addedShown() {
+        _justAdded.value = null
+    }
+
     fun addToWantToRead(match: Match) {
         val id = match.candidate.record.id
         if ((_state.value as? ReleasesState.Loaded)?.added?.contains(id) == true) return
         viewModelScope.launch {
-            repo.addToWantToRead(match)
+            val bookId = repo.addToWantToRead(match)
             _state.update { s -> if (s is ReleasesState.Loaded) s.copy(added = s.added + match.candidate.record.id) else s }
+            _justAdded.value = bookId
         }
     }
 }

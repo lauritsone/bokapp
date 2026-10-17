@@ -76,6 +76,12 @@ import app.shelfmark.ui.theme.LocalExtendedColors
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -84,16 +90,30 @@ import app.shelfmark.ui.components.rememberRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReleasesScreen(onBack: () -> Unit) {
+fun ReleasesScreen(onBack: () -> Unit, onOpenBook: (Long) -> Unit) {
     val repo = rememberRepository()
     val vm: ReleasesViewModel = viewModel(factory = viewModelFactory { initializer { ReleasesViewModel(repo) } })
     val state by vm.state.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf<Match?>(null) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val snackbar = remember { SnackbarHostState() }
+    val resources = LocalResources.current
+    val justAdded by vm.justAdded.collectAsStateWithLifecycle()
+    LaunchedEffect(justAdded) {
+        val id = justAdded ?: return@LaunchedEffect
+        val choice = snackbar.showSnackbar(
+            resources.getString(R.string.added_to_want),
+            actionLabel = resources.getString(R.string.open),
+            duration = SnackbarDuration.Short,
+        )
+        vm.addedShown()
+        if (choice == SnackbarResult.ActionPerformed) onOpenBook(id)
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             ShelfmarkTopBar(
                 title = stringResource(R.string.releases_title),
@@ -129,7 +149,11 @@ fun ReleasesScreen(onBack: () -> Unit) {
             ReleaseDetails(
                 match = current,
                 added = current.candidate.record.id in loaded.added,
-                onAdd = { vm.addToWantToRead(current) },
+                onAdd = {
+                    vm.addToWantToRead(current)
+                    // Closed, so the message about it shows.
+                    open = null
+                },
             )
         }
     }

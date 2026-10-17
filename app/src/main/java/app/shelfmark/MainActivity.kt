@@ -77,7 +77,10 @@ private fun ShelfmarkNavHost() {
         }
 
         composable(Routes.RELEASES) { entry ->
-            ReleasesScreen(onBack = { entry.once { nav.popBackStack() } })
+            ReleasesScreen(
+                onBack = { entry.once { nav.popBackStack() } },
+                onOpenBook = { id -> entry.once { nav.navigate(Routes.detail(id)) } },
+            )
         }
 
         composable(Routes.SCAN, arguments = listOf(shelfArgument)) { entry ->

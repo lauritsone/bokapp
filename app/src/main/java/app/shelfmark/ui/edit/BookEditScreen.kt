@@ -46,7 +46,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,6 +112,26 @@ fun BookEditScreen(
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(state.savedId) { state.savedId?.let(onSaved) }
+    // Leaving with unsaved work asks first, from the back arrow and the system Back alike.
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
+    val leave = { if (state.unsaved) confirmDiscard = true else onBack() }
+    BackHandler(enabled = state.unsaved) { confirmDiscard = true }
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text(stringResource(R.string.discard_title)) },
+            text = { Text(stringResource(R.string.discard_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDiscard = false
+                    onBack()
+                }) { Text(stringResource(R.string.discard), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.keep_editing)) }
+            },
+        )
+    }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val fullWidth = Modifier.fillMaxWidth()
     val nextField = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
@@ -117,7 +142,7 @@ fun BookEditScreen(
         topBar = {
             ShelfmarkTopBar(
                 title = stringResource(if (isNew) R.string.new_book else R.string.edit_details),
-                onBack = onBack,
+                onBack = leave,
                 scrollBehavior = scrollBehavior,
             )
         },
