@@ -72,7 +72,7 @@ fun ProgressCard(book: Book, onSetPage: (Int?) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.progress), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             progress?.let {
-                Text("${(it * 100).toInt()} %", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.progress_percent, (it * 100).toInt()), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -162,7 +162,7 @@ fun LendingSection(book: Book, onLend: (String) -> Unit, onReturned: () -> Unit)
                 )
             },
             confirmButton = {
-                TextButton(onClick = { onLend(name); asking = false }, enabled = name.isNotBlank()) { Text(stringResource(R.string.save)) }
+                TextButton(onClick = { onLend(name); asking = false }, enabled = name.isNotBlank()) { Text(stringResource(R.string.lend)) }
             },
             dismissButton = { TextButton(onClick = { asking = false }) { Text(stringResource(R.string.cancel)) } },
         )
@@ -199,7 +199,7 @@ fun SeriesSection(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        listOfNotNull(b.seriesNumber?.let { "#$it" }, b.title).joinToString("  "),
+                        listOfNotNull(b.seriesNumber?.let { stringResource(R.string.series_position, it) }, b.title).joinToString("  "),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = if (current) FontWeight.SemiBold else null,
                     )

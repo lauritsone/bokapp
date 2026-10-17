@@ -448,7 +448,7 @@ private fun BookRow(book: Book, onClick: () -> Unit, onFinish: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         LinearProgressIndicator(progress = { p }, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(10.dp))
-                        Text("${(p * 100).toInt()} %", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.progress_percent, (p * 100).toInt()), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -610,11 +610,12 @@ private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState):
         if (uri == null) return
         scope.launch {
             val message = try {
-                // Opening a file on Drive and the like can take a while; not on the thread that draws the screen.
-                val out = withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
-                    ?: throw IOException("No output stream")
-                // Finishes even if the screen goes away (rotation, opening a book) part way.
-                val count = withContext(NonCancellable) { repo.export(format, out) }
+                // Finishes even if the screen goes away (rotation, opening a book) part way. Opening
+                // a file on Drive and the like can take a while, so not on the thread that draws the screen.
+                val count = withContext(NonCancellable + Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { repo.export(format, it) }
+                        ?: throw IOException("No output stream")
+                }
                 resources.getQuantityString(R.plurals.export_done, count, count)
             } catch (e: IOException) {
                 resources.getString(R.string.export_failed)
@@ -658,9 +659,10 @@ private fun rememberImporter(repo: BookRepository, snackbar: SnackbarHostState):
         scope.launch {
             val res = resources
             val message = try {
-                val input = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri) }
-                    ?: throw IOException("No input stream")
-                val result = withContext(NonCancellable) { repo.import(input) }
+                val result = withContext(NonCancellable + Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { repo.import(it) }
+                        ?: throw IOException("No input stream")
+                }
                 if (result.added == 0 && result.skipped == 0 && result.updated == 0) {
                     res.getString(R.string.import_nothing)
                 } else {

@@ -42,7 +42,7 @@ fun RatingBar(
 ) {
     val starColor = LocalStarColor.current
     val emptyColor = MaterialTheme.colorScheme.outline
-    val ratedDescription = stringResource(R.string.rated_out_of_5, rating)
+    val ratedDescription = if (rating == 0) stringResource(R.string.not_rated) else stringResource(R.string.rated_out_of_5, rating)
     val a11y = if (onRatingChange == null) {
         Modifier.semantics(mergeDescendants = true) { contentDescription = ratedDescription }
     } else {

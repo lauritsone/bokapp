@@ -127,7 +127,7 @@ private fun Loading(progress: ReleaseProgress?) {
         Spacer(Modifier.height(20.dp))
         Text(
             when (progress) {
-                is ReleaseProgress.LearningTaste -> stringResource(R.string.releases_learning, progress.done, progress.total)
+                is ReleaseProgress.LearningTaste -> pluralStringResource(R.plurals.releases_learning, progress.total, progress.done, progress.total)
                 is ReleaseProgress.ReadingDetails -> stringResource(R.string.releases_reading, progress.done, progress.total)
                 else -> stringResource(R.string.releases_searching)
             },

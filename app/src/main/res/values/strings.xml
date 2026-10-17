@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name" translatable="false">Shelfmark</string>
 
     <!-- Shared -->
@@ -8,7 +8,7 @@
     <string name="untitled">Untitled</string>
     <string name="isbn" translatable="false">ISBN</string>
     <string name="your_notes">Your notes</string>
-    <string name="notes_placeholder">What stayed with you? A favourite line, how it made you feel, who you\'d give it to…</string>
+    <string name="notes_placeholder">What stayed with you? A favourite line, how it made you feel, who you’d give it to…</string>
 
     <!-- Language -->
     <string name="language">Language</string>
@@ -19,13 +19,13 @@
 
     <!-- Rating -->
     <string name="rating_none">Tap a star to rate</string>
-    <string name="rating_1">Didn\'t like it</string>
+    <string name="rating_1">Didn’t like it</string>
     <string name="rating_2">It was okay</string>
     <string name="rating_3">Liked it</string>
     <string name="rating_4">Really liked it</string>
     <string name="rating_5">Loved it</string>
-    <string name="rated_out_of_5">Rated %1$d out of 5</string>
-    <string name="rate_out_of_5">Rate %1$d out of 5</string>
+    <string name="rated_out_of_5" tools:ignore="PluralsCandidate">Rated %1$d out of 5</string>
+    <string name="rate_out_of_5" tools:ignore="PluralsCandidate">Rate %1$d out of 5</string>
     <plurals name="stars">
         <item quantity="one">%1$d star</item>
         <item quantity="other">%1$d stars</item>
@@ -40,7 +40,7 @@
     <string name="books_read_with_average">%1$s, averaging %2$.1f stars</string>
     <string name="scan_a_book">Scan a book</string>
     <string name="add_by_hand">Add a book by hand</string>
-    <string name="search_placeholder">Search titles, authors or notes</string>
+    <string name="search_placeholder">Search titles, authors, notes, tags…</string>
     <string name="clear_search">Clear search</string>
     <string name="searching_all_shelves">Searching all shelves</string>
     <string name="sort_recent">Recently added</string>
@@ -49,16 +49,16 @@
     <string name="sort_author">Author</string>
     <string name="not_rated">Not rated yet</string>
     <string name="empty_title">Start your reading log</string>
-    <string name="empty_body">Scan the barcode on the back of a book you\'ve read, or photograph its cover. Rate it, write down what you thought, and it\'s here whenever you need to remember.</string>
+    <string name="empty_body">Scan the barcode on the back of a book you’ve read, or photograph its cover. Rate it, write down what you thought, and it’s here whenever you need to remember.</string>
     <string name="scan_first_book">Scan your first book</string>
     <string name="no_results">Nothing matches “%1$s”</string>
-    <string name="no_results_hint">Try part of a title, an author\'s name or a word from your notes.</string>
+    <string name="no_results_hint">Try part of a title, an author’s name, a tag or a word from your notes.</string>
 
     <!-- Book page -->
     <string name="edit_details">Edit details</string>
     <string name="remove_from_library">Remove from library</string>
     <string name="remove_title">Remove this book?</string>
-    <string name="remove_body">“%1$s” and your rating and notes will be deleted from your library.</string>
+    <string name="remove_body">“%1$s” will be removed from your library, along with your rating and notes.</string>
     <string name="remove">Remove</string>
     <string name="keep_it">Keep it</string>
     <string name="published">Published</string>
@@ -75,19 +75,19 @@
     <!-- Add / edit -->
     <string name="new_book">New book</string>
     <string name="your_rating">Your rating</string>
-    <string name="finding_isbn">Finding ISBN %1$s…</string>
+    <string name="finding_isbn">Looking up ISBN %1$s…</string>
     <string name="title">Title</string>
     <string name="author">Author</string>
-    <string name="isbn_supporting">Search fills in the title, author and cover for you</string>
+    <string name="isbn_supporting">Look it up to fill in the title, author and cover</string>
     <string name="look_up_isbn">Look up this ISBN</string>
     <string name="save_to_library">Save to library</string>
     <string name="save_changes">Save changes</string>
     <string name="add_title_hint">Add a title to save this book.</string>
-    <string name="msg_invalid_isbn">That ISBN doesn\'t check out. Look for 10 or 13 digits near the barcode.</string>
-    <string name="msg_offline">No connection to the book database. Fill in the details below, or try the lookup again later.</string>
-    <string name="msg_not_found">ISBN %1$s isn\'t in the online catalogues yet. Type the title and find it in the catalogue, or fill in the details yourself.</string>
-    <string name="already_logged_title">You\'ve logged this one</string>
-    <string name="already_logged_body">This book is already in your library. Open it to change your rating or add to your notes.</string>
+    <string name="msg_invalid_isbn">That isn’t a valid ISBN. Look for 10 or 13 digits near the barcode.</string>
+    <string name="msg_offline">No connection to the catalogues. Fill in the details below, or try again later.</string>
+    <string name="msg_not_found">ISBN %1$s isn’t in the catalogues yet. Type the title and search by title instead, or fill in the details yourself.</string>
+    <string name="already_logged_title">Already in your library</string>
+    <string name="already_logged_body">This book is already in your library. Open it to see or change it.</string>
     <string name="open_book">Open book</string>
     <string name="go_back">Go back</string>
 
@@ -95,27 +95,27 @@
     <string name="mode_barcode">Barcode</string>
     <string name="mode_cover">Cover photo</string>
     <string name="hint_barcode">Point at the barcode on the back cover</string>
-    <string name="hint_cover">Fit the front cover inside the frame</string>
+    <string name="hint_cover">Fit the whole front cover inside the frame</string>
     <string name="type_isbn_short">Type ISBN</string>
-    <string name="photo_failed">The photo wasn\'t saved. Hold steady and try again.</string>
+    <string name="photo_failed">The photo wasn’t saved. Hold steady and try again.</string>
     <string name="take_cover_photo">Take cover photo</string>
     <string name="camera_off_title">Camera access is off</string>
-    <string name="camera_off_body">Shelfmark uses the camera to read a book\'s barcode or photograph its cover. Photos stay on this phone.</string>
+    <string name="camera_off_body">Shelfmark uses the camera to read a book’s barcode or photograph its cover. Photos stay on this phone.</string>
     <string name="allow_camera">Allow camera</string>
     <string name="open_settings">Open settings</string>
     <string name="type_isbn_instead">Type the ISBN instead</string>
     <string name="type_isbn_title">Type the ISBN</string>
-    <string name="type_isbn_body">It\'s the 10 or 13 digits printed above the barcode, or on the copyright page.</string>
-    <string name="isbn_invalid">Check the digits. This isn\'t a valid ISBN.</string>
+    <string name="type_isbn_body">It’s the 10 or 13 digits printed above the barcode, or on the copyright page.</string>
+    <string name="isbn_invalid">This isn’t a valid ISBN. Check the digits.</string>
     <string name="look_up_book">Look up book</string>
 
     <!-- Shelves -->
     <string name="shelf_read">Read</string>
     <string name="shelf_reading">Reading</string>
     <string name="shelf_want">Want to read</string>
-    <string name="empty_shelf_read">No finished books yet. When you finish one, mark it as Read.</string>
-    <string name="empty_shelf_reading">Nothing on the go. Mark a book as Reading to keep it here.</string>
-    <string name="empty_shelf_want">Your wishlist is empty. Scan a book you want to read later.</string>
+    <string name="empty_shelf_read">No books read yet. When you finish one, mark it as Read.</string>
+    <string name="empty_shelf_reading">Nothing on the go. Mark a book as Reading to see it here.</string>
+    <string name="empty_shelf_want">No books you want to read yet. Scan one to save it for later.</string>
 
     <!-- Export -->
     <string name="export_library">Export library</string>
@@ -123,13 +123,13 @@
     <string name="export_json">All details (JSON)</string>
     <string name="export_backup">Full backup with photos (ZIP)</string>
     <plurals name="export_done">
-        <item quantity="one">Exported %1$d book</item>
-        <item quantity="other">Exported %1$d books</item>
+        <item quantity="one">Exported %1$d book.</item>
+        <item quantity="other">Exported %1$d books.</item>
     </plurals>
-    <string name="export_failed">Couldn\'t save the file. Try again.</string>
+    <string name="export_failed">Couldn’t save the file. Try again.</string>
 
     <!-- Import -->
-    <string name="import_books">Import books (backup, JSON or CSV)</string>
+    <string name="import_books">Import books…</string>
     <string name="import_from_backup">Import from a backup</string>
     <plurals name="import_done">
         <item quantity="one">Imported %1$d book.</item>
@@ -144,32 +144,35 @@
         <item quantity="other">%1$d books were updated from the newer copy in the file.</item>
     </plurals>
     <string name="import_nothing">No books found in that file.</string>
-    <string name="import_failed">Couldn\'t read that file. Choose a Shelfmark backup (ZIP or JSON) or a CSV file with a title column.</string>
+    <string name="import_failed">Couldn’t read that file. Choose a Shelfmark backup (ZIP or JSON) or a CSV file with a title column.</string>
 
     <!-- New releases -->
     <string name="releases_title">New releases for you</string>
-    <string name="releases_entry_subtitle">New Norwegian and English books for your taste, with a match score</string>
-    <string name="releases_learning">Learning your taste… %1$d of %2$d books</string>
+    <string name="releases_entry_subtitle">New Norwegian and English books picked for your taste, with a match score</string>
+    <plurals name="releases_learning">
+        <item quantity="one">Learning your taste… %1$d of %2$d book</item>
+        <item quantity="other">Learning your taste… %1$d of %2$d books</item>
+    </plurals>
     <string name="releases_searching">Looking for new books…</string>
     <string name="releases_reading">Reading about new books… %1$d of %2$d</string>
-    <string name="releases_offline">Couldn\'t reach the library catalogue. Check your connection and try again.</string>
+    <string name="releases_offline">Couldn’t reach the catalogues. Check your connection and try again.</string>
     <string name="releases_empty">No new books found right now. Try again later.</string>
     <string name="releases_few_books">Rate a few more books for sharper matches.</string>
-    <string name="releases_source">New Norwegian books from the National Library\'s catalogue (nb.no) and new English books from Open Library, scored against your library.</string>
+    <string name="releases_source">New Norwegian books from the National Library’s catalogue (nb.no) and new English books from Open Library, scored against your library.</string>
     <string name="refresh">Refresh</string>
     <string name="try_again">Try again</string>
     <string name="match_percent">%1$d%% match</string>
-    <string name="reason_author">By %1$s, whom you rated %2$d★</string>
+    <string name="reason_author">By %1$s, an author you rate %2$d★ on average</string>
     <string name="reason_author_unrated">By %1$s, an author on your shelves</string>
     <plurals name="reason_genre">
-        <item quantity="one">%1$s, like %2$d of your books</item>
+        <item quantity="one">%1$s, like one of your books</item>
         <item quantity="other">%1$s, like %2$d of your books</item>
     </plurals>
     <plurals name="reason_theme">
-        <item quantity="one">About %1$s, like %2$d of your books</item>
+        <item quantity="one">About %1$s, like one of your books</item>
         <item quantity="other">About %1$s, like %2$d of your books</item>
     </plurals>
-    <string name="reason_series">With %1$s, like a book you’ve read</string>
+    <string name="reason_series">Featuring %1$s, like a book you’ve read</string>
     <string name="add_to_want">Add to Want to read</string>
     <string name="added_to_want">Added to Want to read</string>
 
@@ -184,14 +187,14 @@
     <string name="genre_novel">Novels</string>
     <string name="genre_shortstories">Short stories</string>
     <string name="genre_poetry">Poetry</string>
-    <string name="genre_children">Children\'s books</string>
+    <string name="genre_children">Children’s books</string>
     <string name="genre_youngadult">Young adult</string>
-    <string name="genre_biography">Biography</string>
+    <string name="genre_biography">Biographies</string>
     <string name="genre_history">History</string>
     <string name="genre_essays">Essays</string>
     <string name="genre_humor">Humour</string>
     <string name="genre_selfhelp">Self-help</string>
-    <string name="genre_cooking">Cooking</string>
+    <string name="genre_cooking">Food and drink</string>
     <string name="genre_travel">Travel</string>
     <string name="genre_nature">Nature</string>
     <string name="genre_sport">Sport</string>
@@ -199,7 +202,7 @@
     <string name="lang_all">All</string>
     <string name="lang_norwegian">Norwegian</string>
     <string name="lang_english">English</string>
-    <string name="mark_finished">Finished</string>
+    <string name="mark_finished">Mark as finished</string>
     <string name="finished_title">You finished it!</string>
     <string name="skip_for_now">Skip for now</string>
     <string name="save">Save</string>
@@ -215,39 +218,41 @@
         <item quantity="one">%1$d book is left out of the suggestions.</item>
         <item quantity="other">%1$d books are left out of the suggestions.</item>
     </plurals>
-    <string name="find_in_catalogue">Find by title in the catalogue</string>
-    <string name="pick_edition">Pick your edition</string>
+    <string name="find_in_catalogue">Search the catalogues by title</string>
+    <string name="pick_edition">Choose your edition</string>
     <string name="close">Close</string>
-    <string name="use_this_book">Use that book</string>
+    <string name="use_this_book">Use this book instead</string>
     <string name="msg_isbn_mismatch">ISBN %1$s belongs to “%2$s” by %3$s, not the title you typed. Check the number, or find the book by title instead.</string>
+    <string name="msg_isbn_mismatch_no_author">ISBN %1$s belongs to “%2$s”, not the title you typed. Check the number, or find the book by title instead.</string>
     <string name="msg_no_title_matches">No book with that title in the catalogues. Check the spelling, or fill in the details yourself.</string>
-    <string name="add_missing_details">Add the author and other missing details</string>
-    <string name="refresh_details">Look up details again</string>
-    <string name="find_missing_details">Find missing details</string>
+    <string name="add_missing_details">Look up the author and other details</string>
+    <string name="refresh_details">Look up missing details</string>
+    <string name="find_missing_details">Look up missing details</string>
     <plurals name="refresh_updated">
         <item quantity="one">Found %1$d missing detail.</item>
         <item quantity="other">Found %1$d missing details.</item>
     </plurals>
-    <string name="refresh_nothing_new">Found the book, but the catalogues have nothing it’s missing.</string>
+    <string name="refresh_nothing_new">Found the book, but the catalogues have nothing new to add.</string>
     <string name="refresh_not_found">Couldn’t find this book in the catalogues. Edit it to search by title, or check the spelling.</string>
-    <string name="refresh_ambiguous">Several authors have a book with this title. Edit it to pick the right one.</string>
-    <string name="refresh_offline">No connection to the book databases. Try again later.</string>
+    <string name="refresh_ambiguous">Several authors have a book with this title. Edit it to choose the right one.</string>
+    <string name="refresh_offline">Couldn’t reach the catalogues. Try again later.</string>
     <string name="back_to_form">Back to the form</string>
     <string name="book_not_found">This book is no longer in your library.</string>
     <!-- Reading log: progress, dates, series, format, re-reads, lending, tags -->
     <string name="series">Series</string>
     <string name="series_number">No.</string>
     <string name="series_with_number">%1$s #%2$s</string>
+    <string name="series_position">#%1$s</string>
     <string name="series_title">The %1$s series</string>
     <string name="find_next_in_series">Find the next book in the series</string>
     <string name="next_in_series">Next in the series: %1$s</string>
     <string name="next_unknown">The catalogue doesn’t say which book comes next.</string>
     <string name="sort_series">Series</string>
     <string name="tags">Tags</string>
-    <string name="tags_supporting">Your own labels, separated by commas: book club, gift …</string>
+    <string name="tags_supporting">Your own tags, separated by commas: book club, gift…</string>
     <string name="filtering_all_shelves">Showing books from all shelves</string>
     <string name="format">Format</string>
-    <string name="format_paper">Paper</string>
+    <string name="format_paper">Print</string>
     <string name="format_ebook">E-book</string>
     <string name="format_audiobook">Audiobook</string>
     <string name="progress">Progress</string>
@@ -255,6 +260,7 @@
     <string name="progress_not_started">Tap to note which page you’re on.</string>
     <string name="page_of">Page %1$d of %2$d</string>
     <string name="page_n">Page %1$d</string>
+    <string name="progress_percent">%1$d%%</string>
     <string name="current_page">Page you’re on</string>
     <string name="of_pages">of %1$d</string>
     <string name="started_on">Started</string>
@@ -268,9 +274,10 @@
         <item quantity="other">%1$d times</item>
     </plurals>
     <string name="lend_out">Lend it out</string>
-    <string name="lend_to_whom">Lent to</string>
+    <string name="lend">Lend</string>
+    <string name="lend_to_whom">Who’s borrowing it?</string>
     <string name="lent_to">Lent to %1$s</string>
     <string name="lent_to_since">Lent to %1$s since %2$s</string>
-    <string name="returned">Returned</string>
+    <string name="returned">Mark as returned</string>
     <string name="lent_out_count">Lent out (%1$d)</string>
 </resources>

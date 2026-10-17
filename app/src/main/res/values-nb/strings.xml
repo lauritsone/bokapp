@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Shared -->
     <string name="back">Tilbake</string>
     <string name="cancel">Avbryt</string>
@@ -13,14 +13,14 @@
     <string name="language_system">Telefonens språk</string>
 
     <!-- Rating -->
-    <string name="rating_none">Trykk på en stjerne for å gi karakter</string>
+    <string name="rating_none">Trykk på en stjerne for å vurdere</string>
     <string name="rating_1">Likte den ikke</string>
     <string name="rating_2">Den var grei</string>
     <string name="rating_3">Likte den</string>
     <string name="rating_4">Likte den veldig godt</string>
     <string name="rating_5">Elsket den</string>
-    <string name="rated_out_of_5">%1$d av 5 stjerner</string>
-    <string name="rate_out_of_5">Gi %1$d av 5 stjerner</string>
+    <string name="rated_out_of_5" tools:ignore="PluralsCandidate">%1$d av 5 stjerner</string>
+    <string name="rate_out_of_5" tools:ignore="PluralsCandidate">Gi %1$d av 5 stjerner</string>
     <plurals name="stars">
         <item quantity="one">%1$d stjerne</item>
         <item quantity="other">%1$d stjerner</item>
@@ -35,7 +35,7 @@
     <string name="books_read_with_average">%1$s, i snitt %2$.1f stjerner</string>
     <string name="scan_a_book">Skann en bok</string>
     <string name="add_by_hand">Legg til en bok manuelt</string>
-    <string name="search_placeholder">Søk i titler, forfattere eller notater</string>
+    <string name="search_placeholder">Søk i titler, forfattere, notater, etiketter …</string>
     <string name="clear_search">Tøm søket</string>
     <string name="searching_all_shelves">Søker i alle hyllene</string>
     <string name="sort_recent">Nylig lagt til</string>
@@ -47,13 +47,13 @@
     <string name="empty_body">Skann strekkoden bak på en bok du har lest, eller ta bilde av omslaget. Gi den stjerner, skriv ned hva du syntes, så ligger den her når du vil huske den.</string>
     <string name="scan_first_book">Skann din første bok</string>
     <string name="no_results">Ingen treff på «%1$s»</string>
-    <string name="no_results_hint">Prøv en del av en tittel, et forfatternavn eller et ord fra notatene dine.</string>
+    <string name="no_results_hint">Prøv en del av en tittel, et forfatternavn, en etikett eller et ord fra notatene dine.</string>
 
     <!-- Book page -->
     <string name="edit_details">Rediger detaljer</string>
     <string name="remove_from_library">Fjern fra biblioteket</string>
-    <string name="remove_title">Fjerne denne boken?</string>
-    <string name="remove_body">«%1$s» og karakteren og notatene dine blir slettet fra biblioteket.</string>
+    <string name="remove_title">Vil du fjerne denne boken?</string>
+    <string name="remove_body">«%1$s» blir slettet fra biblioteket, sammen med vurderingen og notatene dine.</string>
     <string name="remove">Fjern</string>
     <string name="keep_it">Behold den</string>
     <string name="published">Utgitt</string>
@@ -69,20 +69,20 @@
 
     <!-- Add / edit -->
     <string name="new_book">Ny bok</string>
-    <string name="your_rating">Din karakter</string>
-    <string name="finding_isbn">Søker etter ISBN %1$s …</string>
+    <string name="your_rating">Vurderingen din</string>
+    <string name="finding_isbn">Slår opp ISBN %1$s …</string>
     <string name="title">Tittel</string>
     <string name="author">Forfatter</string>
-    <string name="isbn_supporting">Søket fyller inn tittel, forfatter og omslag for deg</string>
-    <string name="look_up_isbn">Slå opp dette ISBN-nummeret</string>
+    <string name="isbn_supporting">Slå opp for å fylle inn tittel, forfatter og omslag</string>
+    <string name="look_up_isbn">Slå opp ISBN</string>
     <string name="save_to_library">Lagre i biblioteket</string>
     <string name="save_changes">Lagre endringer</string>
     <string name="add_title_hint">Legg inn en tittel for å lagre boken.</string>
-    <string name="msg_invalid_isbn">Det ISBN-nummeret stemmer ikke. Se etter 10 eller 13 sifre ved strekkoden.</string>
-    <string name="msg_offline">Får ikke kontakt med bokdatabasen. Fyll inn detaljene under, eller prøv å søke igjen senere.</string>
-    <string name="msg_not_found">ISBN %1$s finnes ikke i nettkatalogene ennå. Skriv tittelen og finn den i katalogen, eller fyll inn detaljene selv.</string>
-    <string name="already_logged_title">Denne har du allerede logget</string>
-    <string name="already_logged_body">Boken ligger allerede i biblioteket ditt. Åpne den for å endre karakteren eller skrive mer i notatene.</string>
+    <string name="msg_invalid_isbn">Dette er ikke et gyldig ISBN. Se etter 10 eller 13 sifre ved strekkoden.</string>
+    <string name="msg_offline">Får ikke kontakt med katalogene. Fyll inn detaljene under, eller prøv igjen senere.</string>
+    <string name="msg_not_found">ISBN %1$s finnes ikke i katalogene ennå. Skriv inn tittelen og søk på den i stedet, eller fyll inn detaljene selv.</string>
+    <string name="already_logged_title">Allerede i biblioteket ditt</string>
+    <string name="already_logged_body">Boken ligger allerede i biblioteket ditt. Åpne den for å se eller endre den.</string>
     <string name="open_book">Åpne boken</string>
     <string name="go_back">Gå tilbake</string>
 
@@ -90,27 +90,27 @@
     <string name="mode_barcode">Strekkode</string>
     <string name="mode_cover">Omslagsbilde</string>
     <string name="hint_barcode">Rett kameraet mot strekkoden bak på boken</string>
-    <string name="hint_cover">Få forsiden innenfor rammen</string>
-    <string name="type_isbn_short">Skriv ISBN</string>
+    <string name="hint_cover">Få hele omslaget innenfor rammen</string>
+    <string name="type_isbn_short">Skriv inn ISBN</string>
     <string name="photo_failed">Bildet ble ikke lagret. Hold telefonen stødig og prøv igjen.</string>
     <string name="take_cover_photo">Ta bilde av omslaget</string>
-    <string name="camera_off_title">Kameraet er ikke tillatt</string>
-    <string name="camera_off_body">Shelfmark bruker kameraet til å lese strekkoden på en bok eller ta bilde av omslaget. Bildene blir på telefonen.</string>
+    <string name="camera_off_title">Kameratilgang er slått av</string>
+    <string name="camera_off_body">Shelfmark bruker kameraet til å lese strekkoden på en bok eller ta bilde av omslaget. Bildene lagres bare på telefonen.</string>
     <string name="allow_camera">Gi tilgang til kameraet</string>
     <string name="open_settings">Åpne innstillinger</string>
     <string name="type_isbn_instead">Skriv inn ISBN i stedet</string>
     <string name="type_isbn_title">Skriv inn ISBN</string>
-    <string name="type_isbn_body">Det er de 10 eller 13 sifrene over strekkoden, eller på kolofonsiden.</string>
-    <string name="isbn_invalid">Sjekk sifrene. Dette er ikke et gyldig ISBN.</string>
+    <string name="type_isbn_body">Det er de 10 eller 13 sifrene over strekkoden, eller på baksiden av tittelbladet.</string>
+    <string name="isbn_invalid">Dette er ikke et gyldig ISBN. Sjekk sifrene.</string>
     <string name="look_up_book">Slå opp boken</string>
 
     <!-- Shelves -->
     <string name="shelf_read">Lest</string>
     <string name="shelf_reading">Leser nå</string>
     <string name="shelf_want">Vil lese</string>
-    <string name="empty_shelf_read">Ingen ferdige bøker ennå. Når du er ferdig med en, merker du den som «Lest».</string>
-    <string name="empty_shelf_reading">Ingen bøker på gang. Merk en bok som «Leser nå» for å ha den her.</string>
-    <string name="empty_shelf_want">Ønskelisten er tom. Skann en bok du vil lese senere.</string>
+    <string name="empty_shelf_read">Ingen leste bøker ennå. Når du er ferdig med en bok, merker du den som «Lest».</string>
+    <string name="empty_shelf_reading">Ingen bøker på gang. Merk en bok som «Leser nå», så havner den her.</string>
+    <string name="empty_shelf_want">Ingen bøker du vil lese ennå. Skann en for å ta vare på den til senere.</string>
 
     <!-- Export -->
     <string name="export_library">Eksporter biblioteket</string>
@@ -118,13 +118,13 @@
     <string name="export_json">Alle detaljer (JSON)</string>
     <string name="export_backup">Full sikkerhetskopi med bilder (ZIP)</string>
     <plurals name="export_done">
-        <item quantity="one">Eksporterte %1$d bok</item>
-        <item quantity="other">Eksporterte %1$d bøker</item>
+        <item quantity="one">Eksporterte %1$d bok.</item>
+        <item quantity="other">Eksporterte %1$d bøker.</item>
     </plurals>
     <string name="export_failed">Kunne ikke lagre filen. Prøv igjen.</string>
 
     <!-- Import -->
-    <string name="import_books">Importer bøker (sikkerhetskopi, JSON eller CSV)</string>
+    <string name="import_books">Importer bøker …</string>
     <string name="import_from_backup">Importer fra en sikkerhetskopi</string>
     <plurals name="import_done">
         <item quantity="one">Importerte %1$d bok.</item>
@@ -144,29 +144,32 @@
     <!-- New releases -->
     <string name="releases_title">Nye bøker for deg</string>
     <string name="releases_entry_subtitle">Nye norske og engelske bøker etter din smak, med treffprosent</string>
-    <string name="releases_learning">Lærer smaken din … %1$d av %2$d bøker</string>
+    <plurals name="releases_learning">
+        <item quantity="one">Blir kjent med smaken din … %1$d av %2$d bok</item>
+        <item quantity="other">Blir kjent med smaken din … %1$d av %2$d bøker</item>
+    </plurals>
     <string name="releases_searching">Leter etter nye bøker …</string>
     <string name="releases_reading">Leser om nye bøker … %1$d av %2$d</string>
-    <string name="releases_offline">Fikk ikke kontakt med bibliotekkatalogen. Sjekk nettet og prøv igjen.</string>
+    <string name="releases_offline">Fikk ikke kontakt med katalogene. Sjekk nettforbindelsen og prøv igjen.</string>
     <string name="releases_empty">Fant ingen nye bøker akkurat nå. Prøv igjen senere.</string>
-    <string name="releases_few_books">Gi karakter til flere bøker for mer treffsikre forslag.</string>
+    <string name="releases_few_books">Vurder noen flere bøker for mer treffsikre forslag.</string>
     <string name="releases_source">Nye norske bøker fra Nasjonalbibliotekets katalog (nb.no) og nye engelske bøker fra Open Library, sammenlignet med biblioteket ditt.</string>
     <string name="refresh">Oppdater</string>
     <string name="try_again">Prøv igjen</string>
     <string name="match_percent">%1$d %% treff</string>
-    <string name="reason_author">Av %1$s, som du ga %2$d★</string>
+    <string name="reason_author">Av %1$s, en forfatter du gir %2$d★ i snitt</string>
     <string name="reason_author_unrated">Av %1$s, en forfatter i hyllene dine</string>
     <plurals name="reason_genre">
-        <item quantity="one">%1$s, som %2$d av bøkene dine</item>
+        <item quantity="one">%1$s, som én av bøkene dine</item>
         <item quantity="other">%1$s, som %2$d av bøkene dine</item>
     </plurals>
     <plurals name="reason_theme">
-        <item quantity="one">Om %1$s, som %2$d av bøkene dine</item>
+        <item quantity="one">Om %1$s, som én av bøkene dine</item>
         <item quantity="other">Om %1$s, som %2$d av bøkene dine</item>
     </plurals>
     <string name="reason_series">Med %1$s, som i en bok du har lest</string>
-    <string name="add_to_want">Legg i Vil lese</string>
-    <string name="added_to_want">Lagt i Vil lese</string>
+    <string name="add_to_want">Legg til i «Vil lese»</string>
+    <string name="added_to_want">Lagt til i «Vil lese»</string>
 
     <!-- Genre names for match reasons -->
     <string name="genre_crime">Krim</string>
@@ -194,65 +197,68 @@
     <string name="lang_all">Alle</string>
     <string name="lang_norwegian">Norsk</string>
     <string name="lang_english">Engelsk</string>
-    <string name="mark_finished">Ferdig</string>
-    <string name="finished_title">Du er ferdig!</string>
+    <string name="mark_finished">Merk som lest</string>
+    <string name="finished_title">Du har lest ut boken!</string>
     <string name="skip_for_now">Hopp over</string>
     <string name="save">Lagre</string>
     <string name="finished_on">Ferdig lest</string>
-    <string name="rate_when_finished">Du kan gi stjerner og skrive hva du synes når du er ferdig med den.</string>
-    <string name="moved_to_read">«%1$s» er flyttet til Lest</string>
+    <string name="rate_when_finished">Du kan vurdere den og skrive hva du synes når du er ferdig med den.</string>
+    <string name="moved_to_read">«%1$s» er flyttet til «Lest»</string>
 
     <!-- Holde bøker utenfor forslag til nye bøker -->
     <string name="use_for_suggestions">Bruk i forslag til nye bøker</string>
-    <string name="use_for_suggestions_hint">Slå av for engangslesing utenfor vanlig smak, så de ikke påvirker treffprosentene.</string>
+    <string name="use_for_suggestions_hint">Slå av for bøker utenfor den vanlige smaken din, så de ikke påvirker treffprosentene.</string>
     <string name="left_out_of_suggestions">Holdt utenfor forslag</string>
     <plurals name="releases_ignored">
         <item quantity="one">%1$d bok er holdt utenfor forslagene.</item>
         <item quantity="other">%1$d bøker er holdt utenfor forslagene.</item>
     </plurals>
-    <string name="find_in_catalogue">Finn tittelen i katalogen</string>
-    <string name="pick_edition">Velg din utgave</string>
+    <string name="find_in_catalogue">Søk på tittel i katalogene</string>
+    <string name="pick_edition">Velg utgaven din</string>
     <string name="close">Lukk</string>
-    <string name="use_this_book">Bruk den boken</string>
+    <string name="use_this_book">Bruk denne boken i stedet</string>
     <string name="msg_isbn_mismatch">ISBN %1$s hører til «%2$s» av %3$s, ikke tittelen du skrev. Sjekk nummeret, eller finn boken på tittel i stedet.</string>
+    <string name="msg_isbn_mismatch_no_author">ISBN %1$s hører til «%2$s», ikke tittelen du skrev. Sjekk nummeret, eller finn boken på tittel i stedet.</string>
     <string name="msg_no_title_matches">Fant ingen bok med den tittelen i katalogene. Sjekk stavemåten, eller fyll inn detaljene selv.</string>
-    <string name="add_missing_details">Legg til forfatter og andre manglende detaljer</string>
-    <string name="refresh_details">Slå opp detaljer på nytt</string>
-    <string name="find_missing_details">Finn manglende detaljer</string>
+    <string name="add_missing_details">Slå opp forfatter og andre detaljer</string>
+    <string name="refresh_details">Slå opp manglende detaljer</string>
+    <string name="find_missing_details">Slå opp manglende detaljer</string>
     <plurals name="refresh_updated">
         <item quantity="one">Fant %1$d manglende detalj.</item>
         <item quantity="other">Fant %1$d manglende detaljer.</item>
     </plurals>
-    <string name="refresh_nothing_new">Fant boka, men katalogene har ingenting av det som mangler.</string>
-    <string name="refresh_not_found">Fant ikke boka i katalogene. Rediger den for å søke på tittel, eller sjekk stavemåten.</string>
+    <string name="refresh_nothing_new">Fant boken, men katalogene har ikke noe nytt å legge til.</string>
+    <string name="refresh_not_found">Fant ikke boken i katalogene. Rediger den for å søke på tittel, eller sjekk stavemåten.</string>
     <string name="refresh_ambiguous">Flere forfattere har en bok med denne tittelen. Rediger den for å velge riktig.</string>
-    <string name="refresh_offline">Får ikke kontakt med bokdatabasene. Prøv igjen senere.</string>
+    <string name="refresh_offline">Får ikke kontakt med katalogene. Prøv igjen senere.</string>
     <string name="back_to_form">Tilbake til skjemaet</string>
-    <string name="book_not_found">Denne boka er ikke lenger i biblioteket ditt.</string>
-    <!-- Leselogg: framdrift, datoer, serie, format, omlesing, utlån, etiketter -->
+    <string name="book_not_found">Denne boken er ikke lenger i biblioteket ditt.</string>
+    <!-- Leselogg: fremdrift, datoer, serie, format, omlesing, utlån, etiketter -->
     <string name="series">Serie</string>
     <string name="series_number">Nr.</string>
     <string name="series_with_number">%1$s nr. %2$s</string>
-    <string name="series_title">Serien om %1$s</string>
+    <string name="series_position">Nr. %1$s</string>
+    <string name="series_title">Serien «%1$s»</string>
     <string name="find_next_in_series">Finn neste bok i serien</string>
     <string name="next_in_series">Neste i serien: %1$s</string>
     <string name="next_unknown">Katalogen sier ikke hvilken bok som kommer etter denne.</string>
     <string name="sort_series">Serie</string>
     <string name="tags">Etiketter</string>
-    <string name="tags_supporting">Dine egne merkelapper, skilt med komma: lesesirkel, gave …</string>
+    <string name="tags_supporting">Egne etiketter, skilt med komma: lesesirkel, gave …</string>
     <string name="filtering_all_shelves">Viser bøker fra alle hyllene</string>
     <string name="format">Format</string>
-    <string name="format_paper">Papir</string>
+    <string name="format_paper">Papirbok</string>
     <string name="format_ebook">E-bok</string>
     <string name="format_audiobook">Lydbok</string>
-    <string name="progress">Framdrift</string>
-    <string name="update_progress">Oppdater framdrift</string>
+    <string name="progress">Fremdrift</string>
+    <string name="update_progress">Oppdater fremdrift</string>
     <string name="progress_not_started">Trykk for å notere hvilken side du er på.</string>
     <string name="page_of">Side %1$d av %2$d</string>
     <string name="page_n">Side %1$d</string>
+    <string name="progress_percent">%1$d %%</string>
     <string name="current_page">Siden du er på</string>
     <string name="of_pages">av %1$d</string>
-    <string name="started_on">Startet</string>
+    <string name="started_on">Begynt</string>
     <string name="add_date">Legg til dato</string>
     <string name="change_date">Endre dato</string>
     <string name="clear_date">Fjern</string>
@@ -263,9 +269,10 @@
         <item quantity="other">%1$d ganger</item>
     </plurals>
     <string name="lend_out">Lån den ut</string>
-    <string name="lend_to_whom">Lånt ut til</string>
+    <string name="lend">Lån ut</string>
+    <string name="lend_to_whom">Hvem låner den?</string>
     <string name="lent_to">Lånt ut til %1$s</string>
     <string name="lent_to_since">Lånt ut til %1$s siden %2$s</string>
-    <string name="returned">Levert tilbake</string>
+    <string name="returned">Merk som levert</string>
     <string name="lent_out_count">Utlånt (%1$d)</string>
 </resources>

@@ -191,12 +191,11 @@ fun BookEditScreen(
                             EditMessage.InvalidIsbn -> stringResource(R.string.msg_invalid_isbn)
                             EditMessage.Offline -> stringResource(R.string.msg_offline)
                             is EditMessage.NotFound -> stringResource(R.string.msg_not_found, it.isbn)
-                            is EditMessage.IsbnMismatch -> stringResource(
-                                R.string.msg_isbn_mismatch,
-                                it.isbn,
-                                it.found.title,
-                                it.found.authors.ifBlank { "?" },
-                            )
+                            is EditMessage.IsbnMismatch -> if (it.found.authors.isBlank()) {
+                                stringResource(R.string.msg_isbn_mismatch_no_author, it.isbn, it.found.title)
+                            } else {
+                                stringResource(R.string.msg_isbn_mismatch, it.isbn, it.found.title, it.found.authors)
+                            }
                             EditMessage.NoTitleMatches -> stringResource(R.string.msg_no_title_matches)
                         },
                         action = (it as? EditMessage.IsbnMismatch)?.let { stringResource(R.string.use_this_book) to vm::useMismatch },
