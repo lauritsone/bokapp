@@ -108,6 +108,7 @@ private fun ShelfmarkNavHost() {
                 bookId = id,
                 onBack = { entry.once { nav.popBackStack() } },
                 onEdit = { entry.once { nav.navigate(Routes.editExisting(id)) } },
+                onOpenBook = { other -> entry.once { nav.navigate(Routes.detail(other)) } },
             )
         }
 

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.Book
+import app.shelfmark.data.BookFormat
 import app.shelfmark.data.BookInfo
 import app.shelfmark.data.BookRepository
 import app.shelfmark.data.CatalogRecord
@@ -180,6 +181,7 @@ class BookEditViewModel(
         pageCount = info.pageCount ?: pageCount,
         description = info.description ?: description,
         coverUrl = info.coverUrl ?: coverUrl,
+        series = series ?: info.series,
     )
 
     /** Whether a looked-up title is the book already typed (blank counts as a match). */
@@ -221,6 +223,8 @@ class BookEditViewModel(
         "publishedDate" to publishedDate.orEmpty(), "pageCount" to (pageCount?.toString() ?: ""),
         "description" to description.orEmpty(), "notes" to notes, "rating" to rating.toString(),
         "shelf" to shelf.code.toString(), "coverUrl" to coverUrl.orEmpty(), "photoPath" to photoPath.orEmpty(),
+        "series" to series.orEmpty(), "seriesNumber" to seriesNumber.orEmpty(), "format" to format.code.toString(),
+        "tags" to tags.orEmpty(),
     )
 
     private fun Book.withDraft(d: Map<String, String>) = copy(
@@ -236,6 +240,10 @@ class BookEditViewModel(
         shelf = d["shelf"]?.toIntOrNull()?.let(Shelf::fromCode) ?: shelf,
         coverUrl = d["coverUrl"]?.ifEmpty { null },
         photoPath = d["photoPath"]?.ifEmpty { null },
+        series = d["series"]?.ifEmpty { null },
+        seriesNumber = d["seriesNumber"]?.ifEmpty { null },
+        format = d["format"]?.toIntOrNull()?.let(BookFormat::fromCode) ?: format,
+        tags = d["tags"]?.ifEmpty { null },
     )
 
     // A cover photo taken for a new book that is never saved would stay in storage.

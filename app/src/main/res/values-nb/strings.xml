@@ -115,7 +115,8 @@
     <!-- Export -->
     <string name="export_library">Eksporter biblioteket</string>
     <string name="export_csv">Regneark (CSV)</string>
-    <string name="export_json">Sikkerhetskopi (JSON)</string>
+    <string name="export_json">Alle detaljer (JSON)</string>
+    <string name="export_backup">Full sikkerhetskopi med bilder (ZIP)</string>
     <plurals name="export_done">
         <item quantity="one">Eksporterte %1$d bok</item>
         <item quantity="other">Eksporterte %1$d bøker</item>
@@ -123,7 +124,7 @@
     <string name="export_failed">Kunne ikke lagre filen. Prøv igjen.</string>
 
     <!-- Import -->
-    <string name="import_books">Importer bøker (JSON eller CSV)</string>
+    <string name="import_books">Importer bøker (sikkerhetskopi, JSON eller CSV)</string>
     <string name="import_from_backup">Importer fra en sikkerhetskopi</string>
     <plurals name="import_done">
         <item quantity="one">Importerte %1$d bok.</item>
@@ -133,8 +134,12 @@
         <item quantity="one">%1$d fantes allerede i biblioteket og ble hoppet over.</item>
         <item quantity="other">%1$d fantes allerede i biblioteket og ble hoppet over.</item>
     </plurals>
+    <plurals name="import_updated">
+        <item quantity="one">%1$d bok ble oppdatert fra den nyere kopien i filen.</item>
+        <item quantity="other">%1$d bøker ble oppdatert fra den nyere kopien i filen.</item>
+    </plurals>
     <string name="import_nothing">Fant ingen bøker i filen.</string>
-    <string name="import_failed">Kunne ikke lese filen. Velg en sikkerhetskopi fra Shelfmark (JSON) eller en CSV-fil med en tittelkolonne.</string>
+    <string name="import_failed">Kunne ikke lese filen. Velg en sikkerhetskopi fra Shelfmark (ZIP eller JSON) eller en CSV-fil med en tittelkolonne.</string>
 
     <!-- New releases -->
     <string name="releases_title">Nye bøker for deg</string>
@@ -224,4 +229,43 @@
     <string name="refresh_offline">Får ikke kontakt med bokdatabasene. Prøv igjen senere.</string>
     <string name="back_to_form">Tilbake til skjemaet</string>
     <string name="book_not_found">Denne boka er ikke lenger i biblioteket ditt.</string>
+    <!-- Leselogg: framdrift, datoer, serie, format, omlesing, utlån, etiketter -->
+    <string name="series">Serie</string>
+    <string name="series_number">Nr.</string>
+    <string name="series_with_number">%1$s nr. %2$s</string>
+    <string name="series_title">Serien om %1$s</string>
+    <string name="find_next_in_series">Finn neste bok i serien</string>
+    <string name="next_in_series">Neste i serien: %1$s</string>
+    <string name="next_unknown">Katalogen sier ikke hvilken bok som kommer etter denne.</string>
+    <string name="sort_series">Serie</string>
+    <string name="tags">Etiketter</string>
+    <string name="tags_supporting">Dine egne merkelapper, skilt med komma: lesesirkel, gave …</string>
+    <string name="filtering_all_shelves">Viser bøker fra alle hyllene</string>
+    <string name="format">Format</string>
+    <string name="format_paper">Papir</string>
+    <string name="format_ebook">E-bok</string>
+    <string name="format_audiobook">Lydbok</string>
+    <string name="progress">Framdrift</string>
+    <string name="update_progress">Oppdater framdrift</string>
+    <string name="progress_not_started">Trykk for å notere hvilken side du er på.</string>
+    <string name="page_of">Side %1$d av %2$d</string>
+    <string name="page_n">Side %1$d</string>
+    <string name="current_page">Siden du er på</string>
+    <string name="of_pages">av %1$d</string>
+    <string name="started_on">Startet</string>
+    <string name="add_date">Legg til dato</string>
+    <string name="change_date">Endre dato</string>
+    <string name="clear_date">Fjern</string>
+    <string name="read_again">Les den igjen</string>
+    <string name="times_read">Lest</string>
+    <plurals name="read_times">
+        <item quantity="one">%1$d gang</item>
+        <item quantity="other">%1$d ganger</item>
+    </plurals>
+    <string name="lend_out">Lån den ut</string>
+    <string name="lend_to_whom">Lånt ut til</string>
+    <string name="lent_to">Lånt ut til %1$s</string>
+    <string name="lent_to_since">Lånt ut til %1$s siden %2$s</string>
+    <string name="returned">Levert tilbake</string>
+    <string name="lent_out_count">Utlånt (%1$d)</string>
 </resources>

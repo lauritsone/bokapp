@@ -1,7 +1,11 @@
 package app.shelfmark.ui.edit
 
 import app.shelfmark.R
+import app.shelfmark.data.BookFormat
 import app.shelfmark.data.Shelf
+import app.shelfmark.ui.components.formatIcon
+import app.shelfmark.ui.components.formatLabel
+import androidx.compose.material3.FilterChip
 import app.shelfmark.ui.components.ShelfSelector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
@@ -142,13 +146,6 @@ fun BookEditScreen(
                     Column(Modifier.weight(1f)) {
                         if (book.shelf == Shelf.Read) {
                             Text(stringResource(R.string.your_rating), style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.height(6.dp))
-                            RatingBar(
-                                rating = book.rating,
-                                starSize = 34.dp,
-                                spacing = 0.dp,
-                                onRatingChange = { r -> vm.update { it.copy(rating = r) } },
-                            )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 ratingLabel(book.rating),
@@ -165,6 +162,17 @@ fun BookEditScreen(
                     }
                 }
 
+                if (book.shelf == Shelf.Read) {
+                    // Full width, so each star is big enough to hit.
+                    Spacer(Modifier.height(12.dp))
+                    RatingBar(
+                        rating = book.rating,
+                        starSize = 40.dp,
+                        spacing = 6.dp,
+                        onRatingChange = { r -> vm.update { it.copy(rating = r) } },
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                }
                 Spacer(Modifier.height(20.dp))
                 ShelfSelector(book.shelf, onChange = { s -> vm.update { it.copy(shelf = s) } })
 
@@ -275,6 +283,39 @@ fun BookEditScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = book.series.orEmpty(),
+                            onValueChange = { v -> vm.update { it.copy(series = v.ifEmpty { null }) } },
+                            label = { Text(stringResource(R.string.series)) },
+                            modifier = Modifier.weight(2f),
+                            textStyle = MaterialTheme.typography.bodyLarge,
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                        )
+                        OutlinedTextField(
+                            value = book.seriesNumber.orEmpty(),
+                            onValueChange = { v ->
+                                vm.update { it.copy(seriesNumber = v.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(5).ifEmpty { null }) }
+                            },
+                            label = { Text(stringResource(R.string.series_number)) },
+                            modifier = Modifier.weight(1f),
+                            textStyle = MaterialTheme.typography.bodyLarge,
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        )
+                    }
+                    FormatSelector(book.format, onChange = { f -> vm.update { it.copy(format = f) } })
+                    OutlinedTextField(
+                        value = book.tags.orEmpty(),
+                        onValueChange = { v -> vm.update { it.copy(tags = v.ifEmpty { null }) } },
+                        label = { Text(stringResource(R.string.tags)) },
+                        supportingText = { Text(stringResource(R.string.tags_supporting)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    )
                     if (book.shelf == Shelf.Read || book.notes.isNotBlank()) OutlinedTextField(
                         value = book.notes,
                         onValueChange = { v -> vm.update { it.copy(notes = v) } },
@@ -306,6 +347,29 @@ fun BookEditScreen(
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Paper, ebook or audiobook. */
+@Composable
+private fun FormatSelector(format: BookFormat, onChange: (BookFormat) -> Unit) {
+    Column {
+        Text(
+            stringResource(R.string.format),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BookFormat.entries.forEach { f ->
+                FilterChip(
+                    selected = f == format,
+                    onClick = { onChange(f) },
+                    label = { Text(stringResource(formatLabel(f))) },
+                    leadingIcon = { Icon(formatIcon(f), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
             }
         }
     }

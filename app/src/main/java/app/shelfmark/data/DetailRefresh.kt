@@ -62,6 +62,7 @@ object DetailRefresh {
         publishedDate = book.publishedDate?.ifBlank { null } ?: info.publishedDate,
         pageCount = book.pageCount ?: info.pageCount,
         description = book.description?.ifBlank { null } ?: info.description,
+        series = book.series ?: info.series,
         coverUrl = if (book.coverUrl == null || CoverFinder.isGuess(book.coverUrl)) info.coverUrl ?: book.coverUrl else book.coverUrl,
     )
 
@@ -74,5 +75,6 @@ object DetailRefresh {
         before.pageCount != after.pageCount,
         before.description != after.description,
         before.coverUrl != after.coverUrl,
+        before.series != after.series,
     ).count { it }
 }

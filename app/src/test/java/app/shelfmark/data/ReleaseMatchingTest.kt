@@ -224,4 +224,12 @@ class ReleaseMatchingTest {
         val read = wanted.copy(shelf = Shelf.Read)
         assertTrue("Ny Forfatter" in TasteProfile(listOf(read)).favouriteAuthors(10))
     }
+
+    @Test fun readsSeriesAndNextBookFromCatalogueRecord() {
+        val d = NbCatalog.parseMods(mods("mods-snomannen.xml"))
+        assertEquals("Harry Hole", d.series)
+        assertEquals("Frelseren", d.preceding)
+        assertEquals("Panserhjerte", d.succeeding)
+        assertEquals(null, NbCatalog.parseMods(mods("mods-skyggedyr.xml")).succeeding)
+    }
 }

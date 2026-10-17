@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><mods xmlns="http://www.loc.gov/mods/v3" xmlns:local="http://www.loc.org/namespace" xmlns:nbmodsext="http://www.nb.no/NBModsExtension/v1" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="3.8" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-8.xsd">
+   <titleInfo>
+      <title>Snømannen</title>
+   </titleInfo>
+   <name type="personal" usage="primary">
+      <namePart>Nesbø, Jo</namePart>
+      <namePart type="date">1960-</namePart>
+      <role>
+         <roleTerm authority="marcrelator" type="code">aut</roleTerm>
+      </role>
+      <nameIdentifier>bibsys.no:authority:90356569</nameIdentifier>
+   </name>
+   <typeOfResource>text</typeOfResource>
+   <genre authority="marcgt">novel</genre>
+   <genre type="literaryform">novel</genre>
+   <genre authority="rdacontent">text</genre>
+   <subject authority="bokbas">
+      <genre>Romaner</genre>
+   </subject>
+   <subject authority="bokbas">
+      <genre>Romanar</genre>
+   </subject>
+   <subject authority="bokbas">
+      <genre>Thriller</genre>
+   </subject>
+   <subject authority="bokbas">
+      <genre>Thriller</genre>
+   </subject>
+   <subject authority="bokbas">
+      <genre>Politi og detektiver</genre>
+   </subject>
+   <subject authority="bokbas">
+      <genre>Politi og detektivar</genre>
+   </subject>
+   <subject authority="ntsf">
+      <genre>Romaner</genre>
+   </subject>
+   <originInfo>
+      <place>
+         <placeTerm authority="marccountry" type="code">no</placeTerm>
+      </place>
+      <issuance>monographic</issuance>
+      <place>
+         <placeTerm type="text">Oslo</placeTerm>
+      </place>
+      <agent>
+         <namePart>Aschehoug</namePart>
+         <role>
+            <roleTerm>publisher</roleTerm>
+         </role>
+      </agent>
+      <dateIssued>2017</dateIssued>
+   </originInfo>
+   <language>
+      <languageTerm authority="iso639-2b" type="code">nob</languageTerm>
+   </language>
+   <physicalDescription>
+      <form authority="marcform">print</form>
+      <form authority="marccategory">text</form>
+      <form authority="marcsmd">regular print</form>
+      <form authority="rdamedia" type="media">unmediated</form>
+      <form authority="rdacarrier" type="carrier">volume</form>
+      <internetMediaType>image/jpeg</internetMediaType>
+      <internetMediaType>image/jpeg</internetMediaType>
+      <internetMediaType>image/jpeg</internetMediaType>
+      <internetMediaType>image/jpeg</internetMediaType>
+      <internetMediaType>image/jpeg</internetMediaType>
+      <extent>438 s. 21 cm</extent>
+   </physicalDescription>
+   <abstract type="Summary">Førstebetjent Harry Hole har mottatt et anonymt brev underskrevet "Snømannen". Senere finner han et alarmerende fellestrekk ved gamle forsvinningssaker. Gifte kvinner er blitt borte den dagen årets første snø har falt. Samme natt kaver Sylvia Pedersen gjennom den første snøen i en skog utenfor Oslo. Hun vet at hun løper for livet, men hun vet ikke hva som er etter henne. Og hun vet heldigvis ikke hva som ligger foran henne</abstract>
+   <targetAudience authority="marctarget">adult</targetAudience>
+   <note type="statement of responsibility">Jo Nesbø</note>
+   <note>1. utg. 2007</note>
+   <note type="reproduction">Elektronisk reproduksjon [Norge] Nasjonalbiblioteket Digital 2024-01-17</note>
+   <subject authority="bokbas">
+      <topic>Hole, Harry (fiktiv person)</topic>
+   </subject>
+   <subject authority="bokbas">
+      <geographic>Oslo</geographic>
+   </subject>
+   <subject authority="bokbas">
+      <geographic>Oslo</geographic>
+   </subject>
+   <classification authority="ddc" edition="23/nor">839.823</classification>
+   <location>
+      <url displayLabel="Omslagsbilde" usage="primary display">https://media.boknett.no/objects/57/34/150273457/productimage_ORG_1299cba233b0ee63b804bbab79d7f4b180f4f540.jpg</url>
+   </location>
+   <location>
+      <url displayLabel="Miniatyrbilde">https://media.boknett.no/objects/57/34/150273457/productimage_OS_694d8dfd1d4d47b0f6354c225b4f9c12df388a44.jpg</url>
+   </location>
+   <location>
+      <url displayLabel="Fulltekst Nettbiblioteket" note="Digital representasjon">https://urn.nb.no/URN:NBN:no-nb_digibok_2023071907012</url>
+   </location>
+   <location>
+      <url displayLabel="electronic resource" usage="primary display">http://urn.nb.no/URN:NBN:no-nb_digibok_2023071907012</url>
+   </location>
+   <relatedItem type="preceding">
+      <titleInfo>
+         <title>Frelseren</title>
+      </titleInfo>
+   </relatedItem>
+   <relatedItem type="succeeding">
+      <titleInfo>
+         <title>Panserhjerte</title>
+      </titleInfo>
+   </relatedItem>
+   <relatedItem>
+      <location>
+         <url displayLabel="Forlagets beskrivelse (lang)">https://contents.bibs.aws.unit.no/content/?isbn=9788203362446</url>
+      </location>
+   </relatedItem>
+   <relatedItem>
+      <physicalDescription>
+         <internetMediaType>image/jpeg</internetMediaType>
+      </physicalDescription>
+      <location>
+         <url displayLabel="Miniatyrbilde">https://contents.bibs.aws.unit.no/files/images/small/6/4/9788203362446.jpg</url>
+      </location>
+   </relatedItem>
+   <relatedItem>
+      <physicalDescription>
+         <internetMediaType>image/jpeg</internetMediaType>
+      </physicalDescription>
+      <location>
+         <url displayLabel="Originalt bilde">https://contents.bibs.aws.unit.no/files/images/original/6/4/9788203362446.jpg</url>
+      </location>
+   </relatedItem>
+   <relatedItem>
+      <physicalDescription>
+         <internetMediaType>image/jpeg</internetMediaType>
+      </physicalDescription>
+      <location>
+         <url displayLabel="Omslagsbilde">https://contents.bibs.aws.unit.no/files/images/large/6/4/9788203362446.jpg</url>
+      </location>
+   </relatedItem>
+   <identifier type="isbn">978-82-03-36244-6</identifier>
+   <identifier type="exlnz-47bibsys_network">999920320855002201</identifier>
+   <identifier type="uri">http://urn.nb.no/URN:NBN:no-nb_digibok_2023071907012</identifier>
+   <identifier type="urn">URN:NBN:no-nb_digibok_2023071907012</identifier>
+   <recordInfo>
+      <descriptionStandard>katreg</descriptionStandard>
+      <recordContentSource authority="marcorg">NO-OsBAS</recordContentSource>
+      <recordCreationDate encoding="marc">170608</recordCreationDate>
+      <recordChangeDate encoding="iso8601">20260224T023133.0</recordChangeDate>
+      <recordIdentifier source="nb.bibsys.no">999919892383002202</recordIdentifier>
+      <recordOrigin>Converted from MARCXML to MODS version 3.8 using
+                    MARC21slim_MODS3-8_XSL2-0.xsl (Revision 2.78 2024/10/03)</recordOrigin>
+      <languageOfCataloging>
+         <languageTerm authority="iso639-2b" type="code">nob</languageTerm>
+      </languageOfCataloging>
+   </recordInfo>
+   <relatedItem displayLabel="Del av Bibliografien" type="host">
+      <titleInfo>
+         <title>Norbok</title>
+      </titleInfo>
+      <genre authority="marcgt">bibliography</genre>
+   </relatedItem>
+<identifier type="sesamid">37f82171a630f29531ca112f898830bd</identifier><identifier type="oaiid">oai:nb.bibsys.no:999919892383002202</identifier></mods>

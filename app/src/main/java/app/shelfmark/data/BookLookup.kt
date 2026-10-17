@@ -17,6 +17,9 @@ data class BookInfo(
     val pageCount: Int?,
     val description: String?,
     val coverUrl: String?,
+    /** The series ("Harry Hole") and the next book in it, when the catalogue knows. */
+    val series: String? = null,
+    val nextInSeries: String? = null,
 )
 
 /**
@@ -33,17 +36,33 @@ class BookLookup {
     suspend fun lookup(isbn: String): BookInfo? = withContext(Dispatchers.IO) {
         var reachedASource = false
         val sources: List<(String) -> BookInfo?> = listOf(::fromGoogleBooks, ::fromOpenLibrary, ::fromNationalLibraryNorway, ::fromLibris)
+        // On a poor connection each source can hang until its timeout; past this, stop trying.
+        val giveUpAt = System.currentTimeMillis() + LOOKUP_BUDGET_MS
         for (source in sources) {
+            if (System.currentTimeMillis() > giveUpAt) break
             try {
                 val info = source(isbn)
                 reachedASource = true
                 if (info != null) {
+                    // The National Library knows the series (and often has a Norwegian blurb)
+                    // when another source answered first.
+                    val nb = if (source != sources[2] && System.currentTimeMillis() < giveUpAt) {
+                        runCatching { fromNationalLibraryNorway(isbn) }.getOrNull()
+                    } else {
+                        null
+                    }
+                    val withSeries = info.copy(
+                        series = info.series ?: nb?.series,
+                        nextInSeries = info.nextInSeries ?: nb?.nextInSeries,
+                        description = info.description ?: nb?.description,
+                        coverUrl = info.coverUrl ?: nb?.coverUrl,
+                    )
                     // Only keep the guessed Open Library cover if it really exists; otherwise
                     // the cover repair in BookRepository looks elsewhere later.
-                    return@withContext if (info.coverUrl == null) {
-                        info.copy(coverUrl = openLibraryCover(isbn).takeIf { runCatching { imageExists(it) }.getOrDefault(false) })
+                    return@withContext if (withSeries.coverUrl == null) {
+                        withSeries.copy(coverUrl = openLibraryCover(isbn).takeIf { runCatching { imageExists(it) }.getOrDefault(false) })
                     } else {
-                        info
+                        withSeries
                     }
                 }
             } catch (e: JSONException) {
@@ -57,7 +76,7 @@ class BookLookup {
     }
 
     private fun fromGoogleBooks(isbn: String): BookInfo? {
-        val root = JSONObject(httpGet("https://www.googleapis.com/books/v1/volumes?q=isbn:$isbn"))
+        val root = JSONObject(httpGet("https://www.googleapis.com/books/v1/volumes?q=isbn:$isbn", TIMEOUT_MS))
         val items = root.optJSONArray("items") ?: return null
         if (items.length() == 0) return null
         val info = items.getJSONObject(0).getJSONObject("volumeInfo")
@@ -80,7 +99,7 @@ class BookLookup {
 
     private fun fromOpenLibrary(isbn: String): BookInfo? {
         val root = JSONObject(
-            httpGet("https://openlibrary.org/api/books?bibkeys=ISBN:$isbn&format=json&jscmd=data"),
+            httpGet("https://openlibrary.org/api/books?bibkeys=ISBN:$isbn&format=json&jscmd=data", TIMEOUT_MS),
         )
         val data = root.optJSONObject("ISBN:$isbn") ?: return null
         val title = data.str("title") ?: return null
@@ -98,7 +117,7 @@ class BookLookup {
     }
 
     private fun fromNationalLibraryNorway(isbn: String): BookInfo? {
-        val root = JSONObject(httpGet("https://api.nb.no/catalog/v1/items?q=isbn:$isbn&size=5"))
+        val root = JSONObject(httpGet("https://api.nb.no/catalog/v1/items?q=isbn:$isbn&size=5", TIMEOUT_MS))
         val items = root.optJSONObject("_embedded")?.optJSONArray("items") ?: return null
         val item = (0 until items.length()).map { items.getJSONObject(it) }.firstOrNull { item ->
             val isbns = item.optJSONObject("metadata")?.optJSONObject("identifiers")?.optJSONArray("isbn13")
@@ -108,7 +127,7 @@ class BookLookup {
         val title = data.str("title") ?: return null
         val origin = data.optJSONObject("originInfo")
         // The full record names the main author apart from translators, and has the blurb.
-        val details = runCatching { NbCatalog.parseMods(httpGet("https://api.nb.no/catalog/v1/metadata/${item.optString("id")}/mods")) }.getOrNull()
+        val details = runCatching { NbCatalog.parseMods(httpGet("https://api.nb.no/catalog/v1/metadata/${item.optString("id")}/mods", TIMEOUT_MS)) }.getOrNull()
         return BookInfo(
             isbn = isbn,
             title = ReleaseFinder.displayTitle(title),
@@ -118,11 +137,13 @@ class BookLookup {
             pageCount = data.optInt("pageCount").takeIf { it > 0 },
             description = details?.summary,
             coverUrl = item.optJSONObject("_links")?.optJSONObject("thumbnail_large")?.str("href"),
+            series = details?.series,
+            nextInSeries = details?.succeeding,
         )
     }
 
     private fun fromLibris(isbn: String): BookInfo? {
-        val root = JSONObject(httpGet("https://libris.kb.se/xsearch?query=isbn:$isbn&format=json"))
+        val root = JSONObject(httpGet("https://libris.kb.se/xsearch?query=isbn:$isbn&format=json", TIMEOUT_MS))
         val list = root.optJSONObject("xsearch")?.optJSONArray("list") ?: return null
         val data = (0 until list.length()).map { list.getJSONObject(it) }.firstOrNull { record ->
             record.stringList("isbn").any { Isbn.normalize(it) == isbn }
@@ -141,6 +162,14 @@ class BookLookup {
             description = null,
             coverUrl = null,
         )
+    }
+
+    private companion object {
+        /** Connect timeout per request (reads get 5 s more); the scan screen is waiting. */
+        const val TIMEOUT_MS = 6_000
+
+        /** No new source is tried after this long. */
+        const val LOOKUP_BUDGET_MS = 20_000L
     }
 
     private fun openLibraryCover(isbn: String) =

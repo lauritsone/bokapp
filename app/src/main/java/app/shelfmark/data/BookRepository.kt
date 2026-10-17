@@ -186,6 +186,8 @@ class BookRepository(
             pageCount = record.pageCount,
             description = summary,
             coverUrl = record.coverUrl,
+            series = details?.series,
+            nextInSeries = details?.succeeding,
         )
     }
 
@@ -284,6 +286,13 @@ class BookRepository(
             book.shelf != Shelf.Read -> null
             else -> book.finishedAt
         }
+        // Like the shelf buttons: starting a book (new or moved) on Reading starts it today.
+        val startedAt = when {
+            book.shelf == Shelf.WantToRead -> null
+            // A new book may come with its own start date; a moved one starts now, as with the shelf buttons.
+            book.shelf == Shelf.Reading && previousShelf != Shelf.Reading && (previous != null || book.startedAt == null) -> now
+            else -> book.startedAt
+        }
         // The edit screen holds the book as it was when opened; covers and genres found in the
         // background since then are kept rather than written back over.
         val merged = when {
@@ -296,7 +305,17 @@ class BookRepository(
                 coverCheckedAt = maxOf(book.coverCheckedAt, previous.coverCheckedAt),
             )
         }
-        val rowId = dao.upsert(merged.copy(updatedAt = now, finishedAt = finishedAt))
+        val rowId = dao.upsert(
+            merged.copy(
+                updatedAt = now,
+                finishedAt = finishedAt,
+                startedAt = startedAt,
+                currentPage = merged.currentPage.takeIf { book.shelf == Shelf.Reading },
+                tags = parseTags(merged.tags).joinToString(", ").ifEmpty { null },
+                series = merged.series?.trim()?.ifEmpty { null },
+                seriesNumber = merged.seriesNumber?.trim()?.ifEmpty { null },
+            ),
+        )
         // A replaced cover photo is no longer needed.
         previous?.photoPath?.takeIf { it != book.photoPath }?.let { withContext(Dispatchers.IO) { File(it).delete() } }
         // New, changed or moved books change what's suggested (and an owned book isn't new to the user).
@@ -333,6 +352,92 @@ class BookRepository(
         setNotes(id, notes.trim())
     }
 
+    /** The page the user is on; past the last page counts as the last. */
+    suspend fun setProgress(id: Long, page: Int?) {
+        val total = dao.get(id)?.pageCount
+        val clamped = page?.coerceAtLeast(0)?.let { p -> total?.takeIf { it > 0 }?.let { p.coerceAtMost(it) } ?: p }
+        dao.setProgress(id, clamped, System.currentTimeMillis())
+    }
+
+    /** Sets when the book was started and finished; a finish before the start moves the start back. */
+    suspend fun setDates(id: Long, startedAt: Long?, finishedAt: Long?) {
+        val start = if (startedAt != null && finishedAt != null && startedAt > finishedAt) finishedAt else startedAt
+        dao.setDates(id, start, finishedAt, System.currentTimeMillis())
+    }
+
+    suspend fun lend(id: Long, to: String) =
+        dao.setLent(id, to.trim().ifEmpty { null }, System.currentTimeMillis().takeIf { to.isNotBlank() }, System.currentTimeMillis())
+
+    suspend fun returned(id: Long) = dao.setLent(id, null, null, System.currentTimeMillis())
+
+    /** Starts the book again: back on Reading, counted as a re-read, rating and notes kept. */
+    suspend fun readAgain(id: Long) {
+        dao.readAgain(id, System.currentTimeMillis())
+        lastReleases = null
+    }
+
+    /**
+     * The book after [book] in its series, from the National Library's record, or null if
+     * the catalogue doesn't say. @throws IOException when offline.
+     */
+    suspend fun nextInSeries(book: Book): NextInSeries? = withContext(Dispatchers.IO) {
+        val author = TasteProfile.authorNames(book.authors).firstOrNull()
+        val record = book.isbn?.let { isbn -> Isbn.normalize(isbn)?.let { nb.findByIsbn(it) } }
+            ?.takeIf { DetailRefresh.sameTitle(book.title, it.title) }
+            ?: author?.let { a ->
+                nb.search("\"${book.title}\" \"$a\"", size = 10, norwegianOnly = false)
+                    .firstOrNull { ReleaseFinder.wroteBy(it, a) && DetailRefresh.sameTitle(book.title, it.title) }
+            }
+            ?: return@withContext null
+        val next = try {
+            nb.details(record.id).succeeding
+        } catch (e: JSONException) {
+            null
+        } ?: return@withContext null
+        val owned = dao.getAll().firstOrNull { it.id != book.id && ReleaseFinder.titleKey(it.title) == ReleaseFinder.titleKey(next) }
+        if (owned != null) return@withContext NextInSeries(next, owned = owned, record = null)
+        // The edition to add: the same author's, newest first, Norwegian when there is one.
+        val editions = nb.search(listOfNotNull("\"$next\"", author?.let { "\"$it\"" }).joinToString(" "), size = 20, norwegianOnly = false)
+            .filter { ReleaseFinder.titleKey(it.title) == ReleaseFinder.titleKey(next) && (author == null || ReleaseFinder.wroteBy(it, author)) }
+        val edition = editions.sortedWith(compareBy({ it.language != "nob" }, { it.isbn == null }, { -(it.year ?: 0) })).firstOrNull()
+        NextInSeries(next, owned = null, record = edition)
+    }
+
+    /**
+     * Puts the next book of [after]'s series on Want to read; returns its id. The series and
+     * number carry over. @throws IOException when offline.
+     */
+    suspend fun addNextInSeries(after: Book, next: NextInSeries): Long {
+        next.owned?.let { return it.id }
+        val record = next.record
+        val info = record?.let { r ->
+            try {
+                bookInfo(r)
+            } catch (e: JSONException) {
+                null
+            }
+        }
+        val number = after.seriesNumber?.replace(',', '.')?.toDoubleOrNull()?.let { n ->
+            if (n % 1.0 == 0.0) (n.toInt() + 1).toString() else null
+        }
+        return save(
+            Book(
+                title = info?.title ?: next.title,
+                authors = info?.authors?.ifBlank { null } ?: after.authors,
+                isbn = record?.isbn?.takeIf { dao.findByIsbn(it) == null },
+                publisher = info?.publisher,
+                publishedDate = info?.publishedDate,
+                pageCount = info?.pageCount,
+                description = info?.description,
+                coverUrl = info?.coverUrl,
+                shelf = Shelf.WantToRead,
+                series = after.series ?: info?.series,
+                seriesNumber = number,
+                format = after.format,
+            ),
+        )
+    }
+
     /** Writes every book to [out] and returns how many were exported. */
     suspend fun export(format: ExportFormat, out: OutputStream): Int = withContext(Dispatchers.IO) {
         val books = dao.getAll()
@@ -346,25 +451,69 @@ class BookRepository(
      * @throws ImportException if the file can't be read as either format.
      */
     suspend fun import(input: InputStream): ImportResult = withContext(Dispatchers.IO) {
-        val text = LibraryImport.decode(input.use { it.readBytes() })
-        val incoming = LibraryImport.parse(text)
-        val existing = dao.getAll()
-        val seenIsbns = existing.mapNotNull { it.isbn }.toMutableSet()
-        val seenNames = existing.map(::nameKey).toMutableSet()
-        val fresh = incoming.filter { book ->
-            val duplicate = (book.isbn != null && book.isbn in seenIsbns) || nameKey(book) in seenNames
-            if (!duplicate) {
-                book.isbn?.let(seenIsbns::add)
-                seenNames.add(nameKey(book))
+        val bytes = input.use { it.readBytes() }
+        val backup = if (LibraryBackup.isZip(bytes)) {
+            try {
+                LibraryBackup.read(bytes)
+            } catch (e: java.util.zip.ZipException) {
+                throw ImportException("Not a readable zip file")
             }
-            !duplicate
+        } else {
+            null
+        }
+        val incoming = LibraryImport.parse(backup?.booksJson ?: LibraryImport.decode(bytes))
+            // A photo path only means something inside a backup zip; unpack it to the phone.
+            .map { book -> book.copy(photoPath = book.photoPath?.let { backup?.photos?.get(it) }?.let(::savePhoto)) }
+        val existing = dao.getAll()
+        val byIsbn = existing.filter { it.isbn != null }.associateBy { it.isbn }.toMutableMap()
+        val byName = existing.associateBy(::nameKey).toMutableMap()
+        val now = System.currentTimeMillis()
+        val fresh = mutableListOf<Book>()
+        var updated = 0
+        for (book in incoming) {
+            val match = book.isbn?.let { byIsbn[it] } ?: byName[nameKey(book)]
+            if (match == null) {
+                fresh += book.copy(
+                    updatedAt = book.updatedAt.takeIf { it > 0 } ?: now,
+                    // Genres from a backup needn't be looked up again.
+                    profiledAt = if (book.genres != null) Genres.profiledNow() else 0,
+                )
+                book.isbn?.let { byIsbn[it] = book }
+                byName[nameKey(book)] = book
+                continue
+            }
+            // Listed twice in the file: the first copy is kept.
+            if (match.id == 0L) {
+                book.photoPath?.let { File(it).delete() }
+                continue
+            }
+            // Already in the library: the newer copy wins.
+            val merged = LibraryImport.merge(match, book)
+            if (merged == null) {
+                book.photoPath?.let { File(it).delete() }
+                continue
+            }
+            if (merged.photoPath != match.photoPath) match.photoPath?.let { File(it).delete() }
+            if (book.photoPath != null && merged.photoPath != book.photoPath) File(book.photoPath).delete()
+            dao.upsert(merged)
+            updated++
+            byName[nameKey(merged)] = merged.copy(id = 0)
+            merged.isbn?.let { byIsbn[it] = merged.copy(id = 0) }
         }
         dao.insertAll(fresh)
-        if (fresh.isNotEmpty()) {
+        if (fresh.isNotEmpty() || updated > 0) {
             repairCovers()
             lastReleases = null
         }
-        ImportResult(added = fresh.size, skipped = incoming.size - fresh.size)
+        ImportResult(added = fresh.size, updated = updated, skipped = incoming.size - fresh.size - updated)
+    }
+
+    private fun savePhoto(data: ByteArray): String {
+        val file = newPhotoFile()
+        // Several photos in the same millisecond would share a name.
+        val unique = if (file.exists()) File(file.parentFile, "cover_${System.nanoTime()}.jpg") else file
+        unique.writeBytes(data)
+        return unique.absolutePath
     }
 
     private fun nameKey(book: Book) = foldText(book.title) + "|" + foldText(book.authors)
@@ -382,4 +531,8 @@ class BookRepository(
     }
 }
 
-data class ImportResult(val added: Int, val skipped: Int)
+/** The next book in a series: on a shelf already ([owned]), or a catalogue edition to add. */
+data class NextInSeries(val title: String, val owned: Book?, val record: CatalogRecord?)
+
+/** [updated] books were already in the library, and the imported copy was newer. */
+data class ImportResult(val added: Int, val skipped: Int, val updated: Int = 0)

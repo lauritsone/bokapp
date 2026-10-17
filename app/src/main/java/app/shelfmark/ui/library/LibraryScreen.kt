@@ -98,7 +98,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
+import androidx.compose.material.icons.rounded.Handshake
+import androidx.compose.material.icons.rounded.Sell
+import androidx.compose.material3.LinearProgressIndicator
+import app.shelfmark.data.BookFormat
+import app.shelfmark.data.foldText
+import app.shelfmark.data.progress
+import app.shelfmark.ui.components.formatIcon
+import app.shelfmark.ui.components.formatLabel
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.data.Book
 import app.shelfmark.data.coverModel
@@ -117,7 +126,7 @@ fun LibraryScreen(
     onReleases: () -> Unit,
 ) {
     val repo = rememberRepository()
-    val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(repo) } })
+    val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(repo, createSavedStateHandle()) } })
     val state by vm.state.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -173,7 +182,7 @@ fun LibraryScreen(
                 item(key = "shelves") {
                     if (state.searching) {
                         Text(
-                            stringResource(R.string.searching_all_shelves),
+                            stringResource(if (state.filter != null && query.isBlank()) R.string.filtering_all_shelves else R.string.searching_all_shelves),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 20.dp),
@@ -188,6 +197,11 @@ fun LibraryScreen(
                 item(key = "sort") {
                     SortRow(state.sort, vm::setSort, Modifier.padding(top = 12.dp, bottom = 8.dp))
                 }
+                if (state.tags.isNotEmpty() || state.lentCount > 0) {
+                    item(key = "filters") {
+                        FilterRow(state, vm::setFilter, Modifier.padding(bottom = 8.dp))
+                    }
+                }
             }
             when {
                 !state.loaded -> Unit
@@ -198,7 +212,7 @@ fun LibraryScreen(
                         onImport = import,
                     )
                 }
-                state.books.isEmpty() && query.isBlank() -> item(key = "emptyShelf") { EmptyShelf(state.shelf) }
+                state.books.isEmpty() && query.isBlank() && state.filter == null -> item(key = "emptyShelf") { EmptyShelf(state.shelf) }
                 state.books.isEmpty() -> item(key = "none") { NoResults(query) }
                 else -> items(state.books, key = { it.id }) { book ->
                     Column(Modifier.animateItem()) {
@@ -309,6 +323,34 @@ private fun SortRow(sort: SortMode, onChange: (SortMode) -> Unit, modifier: Modi
     }
 }
 
+/** The user's tags and "Lent out", each showing only those books. */
+@Composable
+private fun FilterRow(state: LibraryState, onChange: (String?) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (state.lentCount > 0) {
+            val selected = state.filter == LENT_FILTER
+            FilterChip(
+                selected = selected,
+                onClick = { onChange(if (selected) null else LENT_FILTER) },
+                label = { Text(stringResource(R.string.lent_out_count, state.lentCount), style = MaterialTheme.typography.labelMedium) },
+                leadingIcon = { Icon(Icons.Rounded.Handshake, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            )
+        }
+        state.tags.forEach { tag ->
+            val selected = state.filter != null && foldText(state.filter) == foldText(tag)
+            FilterChip(
+                selected = selected,
+                onClick = { onChange(if (selected) null else tag) },
+                label = { Text(tag, style = MaterialTheme.typography.labelMedium) },
+                leadingIcon = { Icon(Icons.Rounded.Sell, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            )
+        }
+    }
+}
+
 @Composable
 private fun BookRow(book: Book, onClick: () -> Unit, onFinish: () -> Unit) {
     Row(
@@ -339,10 +381,28 @@ private fun BookRow(book: Book, onClick: () -> Unit, onFinish: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            book.series?.let { series ->
+                Text(
+                    book.seriesNumber?.let { stringResource(R.string.series_with_number, series, it) } ?: series,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ShelfBadge(book.shelf)
                 Spacer(Modifier.width(10.dp))
+                if (book.format != BookFormat.Paper) {
+                    Icon(
+                        formatIcon(book.format),
+                        contentDescription = stringResource(formatLabel(book.format)),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                }
                 // Stars belong to finished books; the others get theirs when they are finished.
                 if (book.shelf == Shelf.Read && book.rating > 0) {
                     RatingBar(book.rating, starSize = 17.dp, spacing = 1.dp)
@@ -362,7 +422,23 @@ private fun BookRow(book: Book, onClick: () -> Unit, onFinish: () -> Unit) {
                     color = MaterialTheme.colorScheme.outline,
                 )
             }
+            book.lentTo?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.lent_to, it),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             if (book.shelf == Shelf.Reading) {
+                book.progress()?.let { p ->
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LinearProgressIndicator(progress = { p }, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(10.dp))
+                        Text("${(p * 100).toInt()} %", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 FinishButton(onFinish)
             }
@@ -476,7 +552,15 @@ private fun LibraryMenu(
                 ExportFormat.entries.forEach { format ->
                     DropdownMenuItem(
                         text = {
-                            Text(stringResource(if (format == ExportFormat.Csv) R.string.export_csv else R.string.export_json))
+                            Text(
+                                stringResource(
+                                    when (format) {
+                                        ExportFormat.Csv -> R.string.export_csv
+                                        ExportFormat.Json -> R.string.export_json
+                                        ExportFormat.Backup -> R.string.export_backup
+                                    },
+                                ),
+                            )
                         },
                         leadingIcon = { Icon(Icons.Rounded.FileDownload, contentDescription = null) },
                         onClick = {
@@ -528,15 +612,20 @@ private fun rememberExporter(repo: BookRepository, snackbar: SnackbarHostState):
 
     val csv = rememberLauncherForActivityResult(CreateDocument(ExportFormat.Csv.mimeType)) { saveTo(ExportFormat.Csv, it) }
     val json = rememberLauncherForActivityResult(CreateDocument(ExportFormat.Json.mimeType)) { saveTo(ExportFormat.Json, it) }
+    val zip = rememberLauncherForActivityResult(CreateDocument(ExportFormat.Backup.mimeType)) { saveTo(ExportFormat.Backup, it) }
     return { format ->
-        val launcher = if (format == ExportFormat.Csv) csv else json
+        val launcher = when (format) {
+            ExportFormat.Csv -> csv
+            ExportFormat.Json -> json
+            ExportFormat.Backup -> zip
+        }
         launcher.launch(LibraryExport.fileName(format))
     }
 }
 
 /** File types offered in the picker; the file's contents decide how it is read. */
 private val ImportMimeTypes = arrayOf(
-    "application/json", "text/csv", "text/comma-separated-values", "text/plain",
+    "application/zip", "application/json", "text/csv", "text/comma-separated-values", "text/plain",
     "application/vnd.ms-excel", "application/octet-stream",
 )
 
@@ -555,11 +644,14 @@ private fun rememberImporter(repo: BookRepository, snackbar: SnackbarHostState):
             val message = try {
                 val input = context.contentResolver.openInputStream(uri) ?: throw IOException("No input stream")
                 val result = withContext(NonCancellable) { repo.import(input) }
-                when {
-                    result.added == 0 && result.skipped == 0 -> res.getString(R.string.import_nothing)
-                    result.skipped == 0 -> res.getQuantityString(R.plurals.import_done, result.added, result.added)
-                    else -> res.getQuantityString(R.plurals.import_done, result.added, result.added) + " " +
-                        res.getQuantityString(R.plurals.import_skipped, result.skipped, result.skipped)
+                if (result.added == 0 && result.skipped == 0 && result.updated == 0) {
+                    res.getString(R.string.import_nothing)
+                } else {
+                    listOfNotNull(
+                        res.getQuantityString(R.plurals.import_done, result.added, result.added),
+                        result.updated.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.import_updated, it, it) },
+                        result.skipped.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.import_skipped, it, it) },
+                    ).joinToString(" ")
                 }
             } catch (e: ImportException) {
                 res.getString(R.string.import_failed)

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -72,6 +73,8 @@ fun RatingBar(
                 contentDescription = if (onRatingChange != null) starsLabel else null,
                 tint = if (filled) starColor else emptyColor,
                 modifier = Modifier
+                    // A finger-sized target around each star that can be tapped.
+                    .then(if (onRatingChange != null) Modifier.minimumInteractiveComponentSize() else Modifier)
                     .size(starSize)
                     .then(tap)
                     .graphicsLayer { scaleX = scale; scaleY = scale },

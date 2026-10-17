@@ -49,6 +49,9 @@ object LibraryImport {
                 ?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).trim().ifEmpty { null } }.joinToString(", ") }
                 ?: o.text("authors").orEmpty()
             val now = System.currentTimeMillis()
+            val tags = o.optJSONArray("tags")
+                ?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).trim().ifEmpty { null } }.joinToString(", ") }
+                ?: o.text("tags")
             Book(
                 title = title,
                 authors = authors,
@@ -62,9 +65,22 @@ object LibraryImport {
                 description = o.text("description"),
                 coverUrl = o.text("coverUrl"),
                 addedAt = parseTime(o.text("addedAt")) ?: now,
-                updatedAt = parseTime(o.text("updatedAt")) ?: now,
+                // 0 = unknown, so a re-import never counts it as the newer copy.
+                updatedAt = parseTime(o.text("updatedAt")) ?: 0,
                 finishedAt = parseTime(o.text("finishedAt")),
                 ignoreForSuggestions = o.optBoolean("ignoreForSuggestions"),
+                startedAt = parseTime(o.text("startedAt")),
+                currentPage = o.optInt("currentPage").takeIf { it > 0 },
+                series = o.text("series"),
+                seriesNumber = o.text("seriesNumber"),
+                format = BookFormat.parse(o.text("format")),
+                rereads = o.optInt("rereads").coerceAtLeast(0),
+                lentTo = o.text("lentTo"),
+                lentAt = parseTime(o.text("lentAt")),
+                tags = parseTags(tags).joinToString(", ").ifEmpty { null },
+                genres = o.text("genres"),
+                // A path inside a backup zip; BookRepository.import unpacks it.
+                photoPath = o.text("photo"),
             )
         }
     }
@@ -94,7 +110,24 @@ object LibraryImport {
         "updated" to listOf("updated", "updatedat"),
         "finished" to listOf("finished", "finishedat", "dateread", "ferdig", "fullfort"),
         "ignore" to listOf("ignoreforsuggestions", "ignore", "ikkeiforslag"),
+        "started" to listOf("started", "startedat", "datestarted", "startet"),
+        "currentPage" to listOf("currentpage", "page", "side"),
+        "series" to listOf("series", "serie"),
+        "seriesNumber" to listOf("seriesnumber", "number", "nummer", "serienummer"),
+        "format" to listOf("format", "binding"),
+        "rereads" to listOf("rereads"),
+        "readCount" to listOf("readcount"),
+        "lentTo" to listOf("lentto", "lanttil", "utlant"),
+        "lentAt" to listOf("lentat", "lantut"),
+        "tags" to listOf("tags", "etiketter", "stikkord"),
+        "bookshelves" to listOf("bookshelves"),
     )
+
+    /** Goodreads puts the series in the title: "Snømannen (Harry Hole, #7)". */
+    private val seriesInTitle = Regex("^(.+?)\\s*\\(([^()]+?),?\\s*#\\s*([0-9]+(?:[.,][0-9]+)?)\\)$")
+
+    /** Goodreads' own shelves, which aren't tags. */
+    private val goodreadsShelves = setOf("read", "toread", "currentlyreading")
 
     private fun columnKey(name: String) = foldText(name).replace(" ", "")
 
@@ -107,7 +140,11 @@ object LibraryImport {
 
         return rows.drop(1).mapNotNull { row ->
             fun cell(key: String) = index[key]?.let { row.getOrNull(it) }?.trim()?.ifEmpty { null }
-            val title = cell("title") ?: return@mapNotNull null
+            val fullTitle = cell("title") ?: return@mapNotNull null
+            val inTitle = if (cell("series") == null) seriesInTitle.find(fullTitle) else null
+            val title = inTitle?.groupValues?.get(1) ?: fullTitle
+            val tags = cell("tags") ?: cell("bookshelves")?.split(',')
+                ?.map { it.trim() }?.filterNot { foldText(it).replace(Regex("[^a-z]"), "") in goodreadsShelves }?.joinToString(", ")
             val authors = listOfNotNull(cell("authors"), cell("extraAuthors")).joinToString(", ")
             val isbn = cleanIsbn(cell("isbn13")) ?: cleanIsbn(cell("isbn"))
             val now = System.currentTimeMillis()
@@ -125,9 +162,19 @@ object LibraryImport {
                 // Without a cover link, BookRepository.repairCovers finds one after the import.
                 coverUrl = cell("cover"),
                 addedAt = parseTime(cell("added")) ?: now,
-                updatedAt = parseTime(cell("updated")) ?: now,
+                updatedAt = parseTime(cell("updated")) ?: 0,
                 finishedAt = parseTime(cell("finished")),
                 ignoreForSuggestions = parseYes(cell("ignore")),
+                startedAt = parseTime(cell("started")),
+                currentPage = cell("currentPage")?.filter(Char::isDigit)?.toIntOrNull()?.takeIf { it > 0 },
+                series = cell("series") ?: inTitle?.groupValues?.get(2)?.trim(),
+                seriesNumber = cell("seriesNumber") ?: inTitle?.groupValues?.get(3),
+                format = BookFormat.parse(cell("format")),
+                rereads = cell("rereads")?.toIntOrNull()?.coerceAtLeast(0)
+                    ?: cell("readCount")?.toIntOrNull()?.let { (it - 1).coerceAtLeast(0) } ?: 0,
+                lentTo = cell("lentTo"),
+                lentAt = parseTime(cell("lentAt")),
+                tags = parseTags(tags).joinToString(", ").ifEmpty { null },
             )
         }
     }
@@ -167,6 +214,42 @@ object LibraryImport {
         }
         endRow()
         return rows
+    }
+
+    // ---------- Merging into the library ----------
+
+    /**
+     * [existing] updated from [incoming] when the import is the newer copy (a backup from
+     * another phone, say), or null when it isn't. What the user records (shelf, rating, notes,
+     * dates …) comes from the import; details only fill gaps; the id is kept.
+     */
+    fun merge(existing: Book, incoming: Book): Book? {
+        if (incoming.updatedAt <= existing.updatedAt) return null
+        return existing.copy(
+            shelf = incoming.shelf,
+            rating = incoming.rating,
+            notes = incoming.notes.ifBlank { existing.notes },
+            finishedAt = if (incoming.shelf == Shelf.Read) incoming.finishedAt ?: existing.finishedAt else null,
+            startedAt = incoming.startedAt ?: existing.startedAt,
+            currentPage = incoming.currentPage,
+            series = incoming.series ?: existing.series,
+            seriesNumber = incoming.seriesNumber ?: existing.seriesNumber,
+            format = incoming.format,
+            rereads = maxOf(incoming.rereads, existing.rereads),
+            lentTo = incoming.lentTo,
+            lentAt = incoming.lentAt,
+            tags = incoming.tags ?: existing.tags,
+            ignoreForSuggestions = incoming.ignoreForSuggestions,
+            isbn = existing.isbn ?: incoming.isbn,
+            publisher = existing.publisher ?: incoming.publisher,
+            publishedDate = existing.publishedDate ?: incoming.publishedDate,
+            pageCount = existing.pageCount ?: incoming.pageCount,
+            description = existing.description ?: incoming.description,
+            coverUrl = existing.coverUrl ?: incoming.coverUrl,
+            photoPath = existing.photoPath ?: incoming.photoPath,
+            genres = existing.genres ?: incoming.genres,
+            updatedAt = incoming.updatedAt,
+        )
     }
 
     // ---------- Shared ----------

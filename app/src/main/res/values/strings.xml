@@ -120,7 +120,8 @@
     <!-- Export -->
     <string name="export_library">Export library</string>
     <string name="export_csv">Spreadsheet (CSV)</string>
-    <string name="export_json">Backup file (JSON)</string>
+    <string name="export_json">All details (JSON)</string>
+    <string name="export_backup">Full backup with photos (ZIP)</string>
     <plurals name="export_done">
         <item quantity="one">Exported %1$d book</item>
         <item quantity="other">Exported %1$d books</item>
@@ -128,7 +129,7 @@
     <string name="export_failed">Couldn\'t save the file. Try again.</string>
 
     <!-- Import -->
-    <string name="import_books">Import books (JSON or CSV)</string>
+    <string name="import_books">Import books (backup, JSON or CSV)</string>
     <string name="import_from_backup">Import from a backup</string>
     <plurals name="import_done">
         <item quantity="one">Imported %1$d book.</item>
@@ -138,8 +139,12 @@
         <item quantity="one">%1$d was already in your library and was skipped.</item>
         <item quantity="other">%1$d were already in your library and were skipped.</item>
     </plurals>
+    <plurals name="import_updated">
+        <item quantity="one">%1$d book was updated from the newer copy in the file.</item>
+        <item quantity="other">%1$d books were updated from the newer copy in the file.</item>
+    </plurals>
     <string name="import_nothing">No books found in that file.</string>
-    <string name="import_failed">Couldn\'t read that file. Choose a Shelfmark backup (JSON) or a CSV file with a title column.</string>
+    <string name="import_failed">Couldn\'t read that file. Choose a Shelfmark backup (ZIP or JSON) or a CSV file with a title column.</string>
 
     <!-- New releases -->
     <string name="releases_title">New releases for you</string>
@@ -229,4 +234,43 @@
     <string name="refresh_offline">No connection to the book databases. Try again later.</string>
     <string name="back_to_form">Back to the form</string>
     <string name="book_not_found">This book is no longer in your library.</string>
+    <!-- Reading log: progress, dates, series, format, re-reads, lending, tags -->
+    <string name="series">Series</string>
+    <string name="series_number">No.</string>
+    <string name="series_with_number">%1$s #%2$s</string>
+    <string name="series_title">The %1$s series</string>
+    <string name="find_next_in_series">Find the next book in the series</string>
+    <string name="next_in_series">Next in the series: %1$s</string>
+    <string name="next_unknown">The catalogue doesn’t say which book comes next.</string>
+    <string name="sort_series">Series</string>
+    <string name="tags">Tags</string>
+    <string name="tags_supporting">Your own labels, separated by commas: book club, gift …</string>
+    <string name="filtering_all_shelves">Showing books from all shelves</string>
+    <string name="format">Format</string>
+    <string name="format_paper">Paper</string>
+    <string name="format_ebook">E-book</string>
+    <string name="format_audiobook">Audiobook</string>
+    <string name="progress">Progress</string>
+    <string name="update_progress">Update progress</string>
+    <string name="progress_not_started">Tap to note which page you’re on.</string>
+    <string name="page_of">Page %1$d of %2$d</string>
+    <string name="page_n">Page %1$d</string>
+    <string name="current_page">Page you’re on</string>
+    <string name="of_pages">of %1$d</string>
+    <string name="started_on">Started</string>
+    <string name="add_date">Add date</string>
+    <string name="change_date">Change date</string>
+    <string name="clear_date">Clear</string>
+    <string name="read_again">Read it again</string>
+    <string name="times_read">Read</string>
+    <plurals name="read_times">
+        <item quantity="one">%1$d time</item>
+        <item quantity="other">%1$d times</item>
+    </plurals>
+    <string name="lend_out">Lend it out</string>
+    <string name="lend_to_whom">Lent to</string>
+    <string name="lent_to">Lent to %1$s</string>
+    <string name="lent_to_since">Lent to %1$s since %2$s</string>
+    <string name="returned">Returned</string>
+    <string name="lent_out_count">Lent out (%1$d)</string>
 </resources>

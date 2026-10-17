@@ -15,7 +15,7 @@ object SearchMatcher {
     fun matches(book: Book, terms: List<String>): Boolean {
         if (terms.isEmpty()) return true
         val text = foldText(
-            listOfNotNull(book.title, book.authors, book.notes, book.isbn, book.publisher).joinToString(" "),
+            listOfNotNull(book.title, book.authors, book.notes, book.isbn, book.publisher, book.series, book.tags, book.lentTo).joinToString(" "),
         )
         return terms.all { it in text }
     }

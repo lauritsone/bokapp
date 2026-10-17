@@ -15,9 +15,11 @@ class LibraryImportTest {
             notes = "Spennende, \"mørk\"\nAndre linje", isbn = "9788203362446", publisher = "Aschehoug",
             publishedDate = "2017", pageCount = 445, description = "Harry Hole, Oslo, \"snø\"", addedAt = 1_700_000_000_000, finishedAt = 1_700_500_000_000,
             coverUrl = "https://www.nb.no/services/image/resolver/URN:NBN:no-nb_digibok_2023071907012_C1/full/0,200/0/native.jpg",
+            startedAt = 1_699_000_000_000, series = "Harry Hole", seriesNumber = "7", format = BookFormat.Audiobook,
+            rereads = 2, lentTo = "Kari, nabo", lentAt = 1_701_000_000_000, tags = "lesesirkel, gave",
         ),
         Book(title = "Pippi Långstrump", authors = "Astrid Lindgren", shelf = Shelf.WantToRead, ignoreForSuggestions = true),
-        Book(title = "Pride and Prejudice", authors = "Jane Austen", shelf = Shelf.Reading, publisher = "Penguin, UK"),
+        Book(title = "Pride and Prejudice", authors = "Jane Austen", shelf = Shelf.Reading, publisher = "Penguin, UK", currentPage = 120),
     )
 
     private fun exported(format: ExportFormat): String {
@@ -49,6 +51,16 @@ class LibraryImportTest {
         // CSV keeps times to the second, so books added the same day keep their order.
         assertEquals(1_700_000_000_000, sno.addedAt)
         assertEquals(1_700_500_000_000, sno.finishedAt)
+        assertEquals(1_699_000_000_000, sno.startedAt)
+        assertEquals("Harry Hole", sno.series)
+        assertEquals("7", sno.seriesNumber)
+        assertEquals(BookFormat.Audiobook, sno.format)
+        assertEquals(2, sno.rereads)
+        assertEquals("Kari, nabo", sno.lentTo)
+        assertEquals(1_701_000_000_000, sno.lentAt)
+        assertEquals(listOf("lesesirkel", "gave"), sno.tagList())
+        assertEquals(120, imported[2].currentPage)
+        assertEquals(BookFormat.Paper, imported[2].format)
     }
 
     private fun localDay(millis: Long) = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
@@ -126,4 +138,56 @@ class LibraryImportTest {
     }
 
     @Test fun emptyFileHasNoBooks() = assertEquals(0, LibraryImport.parse("﻿  \n").size)
+
+    @Test fun backupZipKeepsPhotosAndGenres() {
+        val photo = java.io.File.createTempFile("cover", ".jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val withPhoto = books.mapIndexed { i, b -> b.copy(id = i + 1L, photoPath = if (i == 0) photo.path else null, genres = if (i == 0) "crime" else null) }
+        val out = ByteArrayOutputStream()
+        LibraryExport.write(ExportFormat.Backup, withPhoto, out)
+        val bytes = out.toByteArray()
+        assertTrue(LibraryBackup.isZip(bytes))
+        val contents = LibraryBackup.read(bytes)
+        val parsed = LibraryImport.parse(contents.booksJson)
+        assertSameBooks(parsed)
+        assertEquals("crime", parsed[0].genres)
+        assertEquals(listOf(1.toByte(), 2, 3), contents.photos[parsed[0].photoPath]!!.toList())
+        assertNull(parsed[1].photoPath)
+        photo.delete()
+    }
+
+    @Test fun newerImportUpdatesWhatTheUserRecorded() {
+        val mine = Book(id = 7, title = "Sult", authors = "Knut Hamsun", shelf = Shelf.Reading, notes = "Godt", publisher = "Gyldendal", updatedAt = 1_000)
+        val backup = Book(title = "Sult", authors = "Knut Hamsun", shelf = Shelf.Read, rating = 5, finishedAt = 1_500, publisher = "Annet", tags = "klassiker", updatedAt = 2_000)
+        val merged = LibraryImport.merge(mine, backup)!!
+        assertEquals(7, merged.id)
+        assertEquals(Shelf.Read, merged.shelf)
+        assertEquals(5, merged.rating)
+        assertEquals("Godt", merged.notes)
+        assertEquals("Gyldendal", merged.publisher)
+        assertEquals("klassiker", merged.tags)
+        assertEquals(1_500L, merged.finishedAt)
+        // An older copy, or one with no time (a Goodreads export), changes nothing.
+        assertNull(LibraryImport.merge(mine, backup.copy(updatedAt = 500)))
+        assertNull(LibraryImport.merge(mine, backup.copy(updatedAt = 0)))
+    }
+
+    @Test fun readsGoodreadsSeriesShelvesAndReadCount() {
+        val csv = "Title,Author,Exclusive Shelf,Bookshelves,Read Count\n" +
+            "\"Snømannen (Harry Hole, #7)\",Jo Nesbø,read,\"read, krim, lånt\",3\n"
+        val book = LibraryImport.parse(csv).single()
+        assertEquals("Snømannen", book.title)
+        assertEquals("Harry Hole", book.series)
+        assertEquals("7", book.seriesNumber)
+        assertEquals(listOf("krim", "lånt"), book.tagList())
+        assertEquals(2, book.rereads)
+    }
+
+    @Test fun readsFormats() {
+        assertEquals(BookFormat.Ebook, BookFormat.parse("E-bok"))
+        assertEquals(BookFormat.Ebook, BookFormat.parse("Kindle Edition"))
+        assertEquals(BookFormat.Audiobook, BookFormat.parse("Lydbok"))
+        assertEquals(BookFormat.Audiobook, BookFormat.parse("Audible Audio"))
+        assertEquals(BookFormat.Paper, BookFormat.parse("Paperback"))
+        assertEquals(BookFormat.Paper, BookFormat.parse(null))
+    }
 }

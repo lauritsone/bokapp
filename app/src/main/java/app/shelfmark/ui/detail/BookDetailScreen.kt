@@ -41,6 +41,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import app.shelfmark.data.RefreshResult
+import app.shelfmark.data.tagList
+import app.shelfmark.ui.components.formatLabel
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,6 +93,7 @@ fun BookDetailScreen(
     bookId: Long,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onOpenBook: (Long) -> Unit,
 ) {
     val repo = rememberRepository()
     val vm: BookDetailViewModel = viewModel(factory = viewModelFactory { initializer { BookDetailViewModel(repo, bookId) } })
@@ -100,6 +105,8 @@ fun BookDetailScreen(
     val offline by vm.offline.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val missing by vm.missing.collectAsStateWithLifecycle()
+    val seriesBooks by vm.seriesBooks.collectAsStateWithLifecycle()
+    val next by vm.next.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(refreshResult, offline) {
@@ -176,6 +183,18 @@ fun BookDetailScreen(
                 onUseForSuggestions = vm::setUseForSuggestions,
                 onFindDetails = vm::refresh,
                 refreshing = refreshing,
+                extras = DetailExtras(
+                    seriesBooks = seriesBooks,
+                    next = next,
+                    onOpenBook = onOpenBook,
+                    onFindNext = vm::findNext,
+                    onAddNext = { vm.addNext(onOpenBook) },
+                    onSetPage = vm::setProgress,
+                    onSetDates = vm::setDates,
+                    onLend = vm::lend,
+                    onReturned = vm::returned,
+                    onReadAgain = vm::readAgain,
+                ),
                 modifier = Modifier.padding(padding).consumeWindowInsets(padding),
             )
         }
@@ -208,6 +227,20 @@ fun BookDetailScreen(
     }
 }
 
+/** Actions and data for the reading-log sections of the page. */
+private class DetailExtras(
+    val seriesBooks: List<Book>,
+    val next: NextState,
+    val onOpenBook: (Long) -> Unit,
+    val onFindNext: () -> Unit,
+    val onAddNext: () -> Unit,
+    val onSetPage: (Int?) -> Unit,
+    val onSetDates: (Long?, Long?) -> Unit,
+    val onLend: (String) -> Unit,
+    val onReturned: () -> Unit,
+    val onReadAgain: () -> Unit,
+)
+
 @Composable
 private fun DetailContent(
     book: Book,
@@ -218,8 +251,10 @@ private fun DetailContent(
     onUseForSuggestions: (Boolean) -> Unit,
     onFindDetails: () -> Unit,
     refreshing: Boolean,
+    extras: DetailExtras,
     modifier: Modifier = Modifier,
 ) {
+    var editingDate by rememberSaveable { mutableStateOf<String?>(null) }
     Column(
         modifier
             .fillMaxSize()
@@ -259,6 +294,17 @@ private fun DetailContent(
             }
         }
 
+        if (book.series != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                book.seriesNumber?.let { stringResource(R.string.series_with_number, book.series, it) } ?: book.series,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
         Spacer(Modifier.height(12.dp))
         ShelfBadge(book.shelf, Modifier.align(Alignment.CenterHorizontally))
 
@@ -283,8 +329,14 @@ private fun DetailContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = extras.onReadAgain, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(stringResource(R.string.read_again))
+            }
         } else {
             if (book.shelf == Shelf.Reading) {
+                ProgressCard(book, extras.onSetPage)
+                Spacer(Modifier.height(16.dp))
                 FinishButton(onFinish, large = true)
                 Spacer(Modifier.height(10.dp))
             }
@@ -305,14 +357,23 @@ private fun DetailContent(
 
         book.description?.let { DescriptionSection(it) }
 
+        SeriesSection(book, extras.seriesBooks, extras.next, extras.onOpenBook, extras.onFindNext, extras.onAddNext)
+
         val locale = LocalConfiguration.current.locales[0]
         val facts = buildList {
             book.publishedDate?.let { add(R.string.published to it) }
             book.publisher?.let { add(R.string.publisher to it) }
             book.pageCount?.let { add(R.string.pages to it.toString()) }
             book.isbn?.let { add(R.string.isbn to it) }
+            add(R.string.format to stringResource(formatLabel(book.format)))
+            if (book.rereads > 0) add(R.string.times_read to pluralStringResource(R.plurals.read_times, book.rereads + 1, book.rereads + 1))
+            book.tagList().takeIf { it.isNotEmpty() }?.let { add(R.string.tags to it.joinToString(", ")) }
             add(R.string.added to formatDate(book.addedAt, locale))
-            book.finishedAt?.takeIf { book.shelf == Shelf.Read }?.let { add(R.string.finished_on to formatDate(it, locale)) }
+        }
+        // Reading dates can be set or corrected; books added straight to Read have none.
+        val dates = buildList {
+            if (book.shelf != Shelf.WantToRead) add(Triple("started", R.string.started_on, book.startedAt))
+            if (book.shelf == Shelf.Read) add(Triple("finished", R.string.finished_on, book.finishedAt))
         }
         Spacer(Modifier.height(36.dp))
         Text(stringResource(R.string.details), style = MaterialTheme.typography.titleLarge)
@@ -329,6 +390,38 @@ private fun DetailContent(
                     Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 }
             }
+            dates.forEach { (key, label, value) ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClickLabel = stringResource(R.string.change_date)) { editingDate = key },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(label),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(104.dp),
+                    )
+                    Text(
+                        value?.let { formatDate(it, locale) } ?: stringResource(R.string.add_date),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (value == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        editingDate?.let { key ->
+            ReadingDateDialog(
+                initial = if (key == "started") book.startedAt else book.finishedAt,
+                onDismiss = { editingDate = null },
+                onPick = { picked ->
+                    editingDate = null
+                    if (key == "started") extras.onSetDates(picked, book.finishedAt) else extras.onSetDates(book.startedAt, picked)
+                },
+            )
         }
         val missing = book.description.isNullOrBlank() || book.publisher == null || book.publishedDate == null ||
             book.pageCount == null || book.isbn == null || (book.coverUrl == null && book.photoPath == null)
@@ -348,6 +441,9 @@ private fun DetailContent(
         }
 
         Spacer(Modifier.height(28.dp))
+        LendingSection(book, extras.onLend, extras.onReturned)
+
+        Spacer(Modifier.height(16.dp))
         SuggestionsToggle(use = !book.ignoreForSuggestions, onChange = onUseForSuggestions)
     }
 }

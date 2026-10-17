@@ -42,7 +42,15 @@ data class NbDetails(
     val audience: String? = null,
     /** Dewey number, e.g. "839.8238" (Norwegian fiction) or "641.5" (cooking). */
     val dewey: String? = null,
-)
+    /** The book before and after this one in its series, by title, when the record says. */
+    val preceding: String? = null,
+    val succeeding: String? = null,
+) {
+    /** The series, named after its recurring character ("Harry Hole"), if the record has exactly one. */
+    val series: String?
+        get() = topics.filter { it.endsWith("(fiktiv person)") }
+            .map { personName(it.removeSuffix("(fiktiv person)").trim()) }.distinct().singleOrNull()
+}
 
 /** Client for the parts of api.nb.no that Shelfmark uses. No API key needed. */
 class NbCatalog {
@@ -120,7 +128,13 @@ class NbCatalog {
             val topics = element("topic").findAll(xml).map { unescape(it.groupValues[2]).trim() }.filter { it.isNotEmpty() }.distinct().toList()
             val audience = element("targetAudience").find(xml)?.groupValues?.get(2)?.let(::audienceOf)
             val dewey = Regex("<(?:mods:)?classification[^>]*authority=\"ddc\"[^>]*>\\s*([0-9][0-9.]*)").find(xml)?.groupValues?.get(1)
-            return NbDetails(genres, fiction, language, summary, responsibility?.let(::mainAuthor), topics, audience, dewey)
+            fun related(type: String) = Regex("<(?:mods:)?relatedItem type=\"$type\">\\s*<(?:mods:)?titleInfo>\\s*<(?:mods:)?title>([^<]+)<")
+                .find(xml)?.groupValues?.get(1)?.let(::unescape)?.trim()?.ifEmpty { null }
+            return NbDetails(
+                genres, fiction, language, summary, responsibility?.let(::mainAuthor), topics, audience, dewey,
+                preceding = related("preceding"),
+                succeeding = related("succeeding"),
+            )
         }
 
         /** "adult", "Voksne", "juvenile", "Barn" … as "adult" or "juvenile". */

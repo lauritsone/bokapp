@@ -6,7 +6,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Book::class], version = 6, exportSchema = false)
+@Database(entities = [Book::class], version = 7, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
@@ -45,6 +45,21 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE books ADD COLUMN ignoreForSuggestions INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Reading dates and progress, series, format, re-reads, lending and the user's own tags. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN startedAt INTEGER")
+                db.execSQL("ALTER TABLE books ADD COLUMN currentPage INTEGER")
+                db.execSQL("ALTER TABLE books ADD COLUMN series TEXT")
+                db.execSQL("ALTER TABLE books ADD COLUMN seriesNumber TEXT")
+                db.execSQL("ALTER TABLE books ADD COLUMN format INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE books ADD COLUMN rereads INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE books ADD COLUMN lentTo TEXT")
+                db.execSQL("ALTER TABLE books ADD COLUMN lentAt INTEGER")
+                db.execSQL("ALTER TABLE books ADD COLUMN tags TEXT")
             }
         }
     }
