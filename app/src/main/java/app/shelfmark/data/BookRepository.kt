@@ -26,8 +26,10 @@ class BookRepository(
 ) {
     val books: Flow<List<Book>> = dao.observeAll()
 
-    private val releaseFinder = ReleaseFinder(dao, NbCatalog(), OlCatalog())
-    private val coverFinder = CoverFinder(NbCatalog())
+    private val nb = NbCatalog()
+    private val ol = OlCatalog()
+    private val releaseFinder = ReleaseFinder(dao, nb, ol)
+    private val coverFinder = CoverFinder(nb)
 
     /** Work that should finish even if the user leaves the screen that started it. */
     private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -129,17 +131,74 @@ class BookRepository(
 
     suspend fun lookup(isbn: String): BookInfo? = bookLookup.lookup(isbn)
 
+    /**
+     * Editions in the catalogues (NB.no, then English ones on Open Library) whose title
+     * contains [title], by [author] when one is given. For books whose barcode won't scan.
+     * @throws IOException if neither catalogue can be reached.
+     */
+    suspend fun searchCatalogue(title: String, author: String): List<CatalogRecord> = withContext(Dispatchers.IO) {
+        val wanted = foldText(title)
+        if (wanted.isEmpty()) return@withContext emptyList()
+        val name = TasteProfile.authorNames(author).firstOrNull()
+        val sources = listOf(
+            suspend { nb.search(listOfNotNull("\"${title.trim()}\"", name?.let { "\"$it\"" }).joinToString(" "), size = 30, norwegianOnly = false) },
+            suspend { ol.search(listOfNotNull("title:\"${title.trim()}\"", name?.let { "author:\"$it\"" }).joinToString(" "), fromYear = 0, limit = 10) },
+        )
+        var reached = false
+        val found = sources.flatMap { source ->
+            try {
+                source().also { reached = true }
+            } catch (e: IOException) {
+                emptyList()
+            } catch (e: JSONException) {
+                reached = true
+                emptyList()
+            }
+        }
+        if (!reached) throw IOException("No catalogue could be reached")
+        found
+            .filter { wanted in foldText(it.title) && (name == null || ReleaseFinder.wroteBy(it, name)) }
+            .distinctBy { it.isbn ?: it.id }
+            // The exact title before longer ones that contain it, then the newest edition.
+            .sortedWith(compareBy({ ReleaseFinder.titleKey(it.title) != ReleaseFinder.titleKey(title) }, { -(it.year ?: 0) }))
+            .take(20)
+    }
+
+    /** Everything worth filling in from a [searchCatalogue] result: the main author and the blurb too. */
+    suspend fun bookInfo(record: CatalogRecord): BookInfo = withContext(Dispatchers.IO) {
+        val fromOl = record.id.startsWith(OlCatalog.ID_PREFIX)
+        val details = if (fromOl) null else runCatching { nb.details(record.id) }.getOrNull()
+        val summary = if (fromOl) runCatching { ol.description(record) }.getOrNull() else details?.summary
+        BookInfo(
+            isbn = record.isbn.orEmpty(),
+            title = ReleaseFinder.displayTitle(record.title),
+            // Catalogues list translators and illustrators as creators too; the first is the author.
+            authors = details?.author ?: record.creators.firstOrNull()?.let(::personName).orEmpty(),
+            publisher = record.publisher,
+            publishedDate = record.year?.toString(),
+            pageCount = record.pageCount,
+            description = summary,
+            coverUrl = record.coverUrl,
+        )
+    }
+
     /** Inserts or updates; returns the book's id. */
     suspend fun save(book: Book): Long {
         val now = System.currentTimeMillis()
-        val previousShelf = if (book.id == 0L) null else dao.get(book.id)?.shelf
+        val previous = if (book.id == 0L) null else dao.get(book.id)
+        val previousShelf = previous?.shelf
+        // Corrected details may point at another catalogue record, so its genres are learned again.
+        val identityChanged = previous != null &&
+            (previous.isbn != book.isbn || foldText(previous.title) != foldText(book.title) || foldText(previous.authors) != foldText(book.authors))
         val finished = previousShelf != null && previousShelf != Shelf.Read && book.shelf == Shelf.Read
         val finishedAt = when {
             finished -> now
             book.shelf != Shelf.Read -> null
             else -> book.finishedAt
         }
-        val rowId = dao.upsert(book.copy(updatedAt = now, finishedAt = finishedAt))
+        val relearn = if (identityChanged) book.copy(genres = null, profiledAt = 0) else book
+        val rowId = dao.upsert(relearn.copy(updatedAt = now, finishedAt = finishedAt))
+        if (identityChanged) lastReleases = null
         if (book.photoPath == null && (book.coverUrl == null || CoverFinder.isGuess(book.coverUrl))) repairCovers()
         return if (book.id == 0L) rowId else book.id
     }

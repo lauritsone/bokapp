@@ -22,15 +22,14 @@ sealed interface MatchReason {
     data class Theme(val label: String, val books: Int) : MatchReason
     /** The same recurring character as a book the user has read. */
     data class Series(val name: String) : MatchReason
-    data class Publisher(val name: String) : MatchReason
 }
 
 data class Match(val candidate: Candidate, val percent: Int, val reasons: List<MatchReason>)
 
 /**
- * What the user likes, learned from their library: authors, genres, subjects, mood,
- * audience and publishers, each weighted by how the user rated those books.
- * Scores new books against it.
+ * What the user likes, learned from their library: authors, genres, subjects, mood and
+ * audience, each weighted by how the user rated those books. Scores new books against it.
+ * Who published a book plays no part.
  */
 class TasteProfile(books: List<Book>) {
 
@@ -43,8 +42,6 @@ class TasteProfile(books: List<Book>) {
     private val topicCounts = mutableMapOf<String, Int>()
     private val toneWeights = mutableMapOf<String, Double>()
     private val literatureWeights = mutableMapOf<String, Double>()
-    private val publisherWeights = mutableMapOf<String, Double>()
-    private val publisherNames = mutableMapOf<String, String>()
     private var fictionWeight = 0.0
     private var nonfictionWeight = 0.0
     private var juvenileWeight = 0.0
@@ -100,11 +97,6 @@ class TasteProfile(books: List<Book>) {
                 if (Genres.JUVENILE in tags) juvenileWeight += w
                 if (Genres.ADULT in tags) adultWeight += w
             }
-            book.publisher?.takeIf { publisherKey(it).isNotEmpty() }?.let { name ->
-                val key = publisherKey(name)
-                publisherWeights.add(key, w)
-                publisherNames.getOrPut(key) { name.trim() }
-            }
         }
         bookCount = counted
     }
@@ -123,17 +115,32 @@ class TasteProfile(books: List<Book>) {
     fun favouriteAuthors(limit: Int): List<String> =
         authors.values.filter { it.weight > 0.3 }.sortedByDescending { it.weight }.take(limit).map { it.name }
 
-    /** Publishers to look up new books from, most read first, as the user's books spell them. */
-    fun favouritePublishers(limit: Int): List<String> =
-        publisherWeights.filterValues { it > 0.3 }.entries.sortedByDescending { it.value }.take(limit)
-            .map { publisherNames.getValue(it.key) }
-
     /** Genres the user reads most, specific ones before the catch-all "novel". */
     fun topGenres(limit: Int): List<String> =
         genreWeights.filterValues { it > 0.3 }.entries
             .filter { !it.key.startsWith(Genres.DEWEY) }
             .sortedWith(compareBy({ it.key == "novel" }, { -it.value }))
             .take(limit).map { it.key }
+
+    /**
+     * Whether [c] is in a subgenre the user reads (or a close one, like romance for a
+     * feelgood reader). A plain "novel" only fits a reader whose own novels are mostly
+     * catalogued as just that. New books by a favourite author always fit.
+     */
+    fun fitsGenres(c: Candidate): Boolean {
+        val author = authorNames(c.author).mapNotNull { authors[foldText(it)] }.maxOfOrNull { it.weight } ?: 0.0
+        if (author > 0.2) return true
+        val read = genreWeights.filter { (tag, w) -> w > 0 && (Genres.isSpecific(tag) || tag.startsWith(Genres.DEWEY)) }
+        // Nothing to judge by yet: the score alone decides.
+        if (read.isEmpty()) return true
+        val specific = c.tags.filter { Genres.isSpecific(it) || it.startsWith(Genres.DEWEY) }
+        if (specific.isEmpty()) {
+            val plainShare = if (novelWeight > 0) plainNovelWeight / novelWeight else 0.0
+            return "novel" in c.tags && plainShare >= 0.5
+        }
+        fun reads(tag: String) = share(read, tag) >= 0.15
+        return specific.any { tag -> reads(tag) || Genres.related[tag].orEmpty().any(::reads) }
+    }
 
     fun score(c: Candidate): Match {
         val reasons = mutableListOf<MatchReason>()
@@ -208,15 +215,7 @@ class TasteProfile(books: List<Book>) {
         val literature = c.tags.firstOrNull { it.startsWith(Genres.LITERATURE) }
         val literatureScore = if (literature == null || literatureWeights.isEmpty()) 0.5 else share(literatureWeights, literature)
 
-        val publisherScore = c.record.publisher?.let { publisherKey(it) }?.let { share(publisherWeights, it) } ?: 0.0
-        if (c.record.language == "nob" && publisherScore >= 0.3) reasons += MatchReason.Publisher(c.record.publisher!!)
-
-        // The user's publishers are the Norwegian houses they read, so for books from other
-        // markets (English editions) the publisher part is left out rather than counted as a miss.
-        val usesPublisher = c.record.language == "nob"
-        // Big publishers publish every kind of book, so the publisher only nudges.
-        val content = (0.55 * genreScore + 0.20 * themeScore + 0.15 * formScore + 0.05 * literatureScore +
-            (if (usesPublisher) 0.05 * publisherScore else 0.0)) / (if (usesPublisher) 1.0 else 0.95)
+        val content = (0.55 * genreScore + 0.20 * themeScore + 0.15 * formScore + 0.05 * literatureScore) / 0.95
         // A favourite author lifts a book a long way; a new author is no mark against it.
         var score = content + (1 - content) * 0.6 * authorScore.coerceAtLeast(0.0)
 
@@ -265,9 +264,5 @@ class TasteProfile(books: List<Book>) {
 
         fun authorNames(authors: String): List<String> =
             authors.split(",", ";", "&", " og ", " and ").map { it.trim() }.filter { it.length > 1 }
-
-        /** "Cappelen Damm AS" and "Cappelen Damm" are the same publisher. */
-        fun publisherKey(name: String): String =
-            foldText(name).removeSuffix(" as").removeSuffix(" forlag").removeSuffix(" asa").trim()
     }
 }

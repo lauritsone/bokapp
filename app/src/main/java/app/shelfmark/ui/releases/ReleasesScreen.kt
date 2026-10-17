@@ -309,7 +309,6 @@ private fun reasonText(reason: MatchReason): String = when (reason) {
     // Subjects are catalogued in Norwegian with a capital ("Vennskap"); places keep theirs.
     is MatchReason.Theme -> pluralStringResource(R.plurals.reason_theme, reason.books, reason.label.lowercaseUnlessName(), reason.books)
     is MatchReason.Series -> stringResource(R.string.reason_series, reason.name)
-    is MatchReason.Publisher -> stringResource(R.string.reason_publisher, reason.name)
 }
 
 private val placeNames = Regex("^(Oslo|Bergen|Trondheim|Stavanger|Paris|London|Norge|Sverige|Danmark|[A-ZÆØÅ][a-zæøå]+ (fylke|kommune))$")

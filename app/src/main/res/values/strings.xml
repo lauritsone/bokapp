@@ -85,7 +85,7 @@
     <string name="add_title_hint">Add a title to save this book.</string>
     <string name="msg_invalid_isbn">That ISBN doesn\'t check out. Look for 10 or 13 digits near the barcode.</string>
     <string name="msg_offline">No connection to the book database. Fill in the details below, or try the lookup again later.</string>
-    <string name="msg_not_found">ISBN %1$s isn\'t in the online catalogues yet. Add the title and author below.</string>
+    <string name="msg_not_found">ISBN %1$s isn\'t in the online catalogues yet. Type the title and find it in the catalogue, or fill in the details yourself.</string>
     <string name="already_logged_title">You\'ve logged this one</string>
     <string name="already_logged_body">This book is already in your library. Open it to change your rating or add to your notes.</string>
     <string name="open_book">Open book</string>
@@ -165,7 +165,6 @@
         <item quantity="other">About %1$s, like %2$d of your books</item>
     </plurals>
     <string name="reason_series">With %1$s, like a book you’ve read</string>
-    <string name="reason_publisher">From %1$s, a publisher you read</string>
     <string name="add_to_want">Add to Want to read</string>
     <string name="added_to_want">Added to Want to read</string>
 
@@ -211,4 +210,11 @@
         <item quantity="one">%1$d book is left out of the suggestions.</item>
         <item quantity="other">%1$d books are left out of the suggestions.</item>
     </plurals>
+    <string name="find_in_catalogue">Find by title in the catalogue</string>
+    <string name="pick_edition">Pick your edition</string>
+    <string name="close">Close</string>
+    <string name="use_this_book">Use that book</string>
+    <string name="msg_isbn_mismatch">ISBN %1$s belongs to “%2$s” by %3$s, not the title you typed. Check the number, or find the book by title instead.</string>
+    <string name="msg_no_title_matches">No book with that title in the catalogues. Check the spelling, or fill in the details yourself.</string>
+    <string name="add_missing_details">Add the author and other missing details</string>
 </resources>

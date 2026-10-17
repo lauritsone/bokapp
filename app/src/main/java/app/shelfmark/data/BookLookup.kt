@@ -107,14 +107,16 @@ class BookLookup {
         val data = item.getJSONObject("metadata")
         val title = data.str("title") ?: return null
         val origin = data.optJSONObject("originInfo")
+        // The full record names the main author apart from translators, and has the blurb.
+        val details = runCatching { NbCatalog.parseMods(httpGet("https://api.nb.no/catalog/v1/metadata/${item.optString("id")}/mods")) }.getOrNull()
         return BookInfo(
             isbn = isbn,
-            title = title,
-            authors = data.optJSONArray("creators").names().joinToString(", ") { personName(it) },
+            title = ReleaseFinder.displayTitle(title),
+            authors = details?.author ?: data.optJSONArray("creators").names().firstOrNull()?.let(::personName).orEmpty(),
             publisher = origin?.str("publisher"),
-            publishedDate = origin?.str("issued"),
+            publishedDate = origin?.str("issued")?.take(4),
             pageCount = data.optInt("pageCount").takeIf { it > 0 },
-            description = null,
+            description = details?.summary,
             coverUrl = item.optJSONObject("_links")?.optJSONObject("thumbnail_large")?.str("href"),
         )
     }

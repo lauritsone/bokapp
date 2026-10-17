@@ -5,6 +5,7 @@ import app.shelfmark.data.Shelf
 import app.shelfmark.ui.components.ShelfSelector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,7 +56,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import app.shelfmark.data.CatalogRecord
+import app.shelfmark.data.ReleaseFinder
 import app.shelfmark.data.coverModel
+import app.shelfmark.data.personName
 import app.shelfmark.ui.components.BookCover
 import app.shelfmark.ui.components.CoverShape
 import app.shelfmark.ui.components.RatingBar
@@ -171,7 +176,15 @@ fun BookEditScreen(
                             EditMessage.InvalidIsbn -> stringResource(R.string.msg_invalid_isbn)
                             EditMessage.Offline -> stringResource(R.string.msg_offline)
                             is EditMessage.NotFound -> stringResource(R.string.msg_not_found, it.isbn)
+                            is EditMessage.IsbnMismatch -> stringResource(
+                                R.string.msg_isbn_mismatch,
+                                it.isbn,
+                                it.found.title,
+                                it.found.authors.ifBlank { "?" },
+                            )
+                            EditMessage.NoTitleMatches -> stringResource(R.string.msg_no_title_matches)
                         },
+                        action = (it as? EditMessage.IsbnMismatch)?.let { stringResource(R.string.use_this_book) to vm::useMismatch },
                     )
                 }
 
@@ -201,6 +214,22 @@ fun BookEditScreen(
                             imeAction = ImeAction.Next,
                         ),
                     )
+                    OutlinedButton(
+                        onClick = vm::searchTitle,
+                        enabled = book.title.isNotBlank() && !state.searching && !state.loading,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (state.searching) {
+                            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                        } else {
+                            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.find_in_catalogue))
+                    }
+                    state.results?.takeIf { it.isNotEmpty() }?.let { results ->
+                        SearchResults(results, onPick = vm::pick, onClose = vm::closeResults)
+                    }
                     OutlinedTextField(
                         value = book.isbn.orEmpty(),
                         onValueChange = { v -> vm.update { it.copy(isbn = v.take(17).ifBlank { null }) } },
@@ -276,7 +305,7 @@ fun BookEditScreen(
 }
 
 @Composable
-private fun Notice(text: String) {
+private fun Notice(text: String, action: Pair<String, () -> Unit>? = null) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -292,7 +321,52 @@ private fun Notice(text: String) {
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(12.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Column {
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            action?.let { (label, onClick) ->
+                TextButton(onClick = onClick) { Text(label) }
+            }
+        }
+    }
+}
+
+/** Editions found by title; tapping one fills in the form. */
+@Composable
+private fun SearchResults(results: List<CatalogRecord>, onPick: (CatalogRecord) -> Unit, onClose: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(vertical = 8.dp),
+    ) {
+        Text(
+            stringResource(R.string.pick_edition),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        results.forEach { r ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onPick(r) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BookCover(r.coverUrl, r.title, Modifier.width(40.dp), elevation = 2.dp)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(ReleaseFinder.displayTitle(r.title), style = MaterialTheme.typography.bodyLarge, maxLines = 2)
+                    r.creators.firstOrNull()?.let {
+                        Text(personName(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    listOfNotNull(r.publisher, r.year?.toString(), r.isbn).joinToString(" · ").takeIf { it.isNotEmpty() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        TextButton(onClick = onClose, modifier = Modifier.padding(horizontal = 8.dp)) { Text(stringResource(R.string.close)) }
     }
 }
 

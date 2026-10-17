@@ -48,7 +48,7 @@ data class NbDetails(
 class NbCatalog {
 
     /** Books matching [query] (NB search syntax), optionally limited to one year and Bokmål. */
-    suspend fun search(query: String, year: Int? = null, size: Int = 40, norwegianOnly: Boolean = true): List<CatalogRecord> =
+    suspend fun search(query: String, year: Int? = null, size: Int = 40, norwegianOnly: Boolean = true, page: Int = 0): List<CatalogRecord> =
         withContext(Dispatchers.IO) {
             val params = buildList {
                 add("q=" + enc(query))
@@ -56,6 +56,7 @@ class NbCatalog {
                 year?.let { add("filter=" + enc("year:$it")) }
                 if (norwegianOnly) add("filter=" + enc("languages:nob"))
                 add("size=$size")
+                if (page > 0) add("page=$page")
             }
             parseSearch(httpGet("$BASE/items?" + params.joinToString("&")))
         }

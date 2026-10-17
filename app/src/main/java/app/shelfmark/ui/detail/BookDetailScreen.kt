@@ -118,6 +118,7 @@ fun BookDetailScreen(
                 onFinish = vm::finish,
                 onSaveNotes = vm::saveNotes,
                 onUseForSuggestions = vm::setUseForSuggestions,
+                onEdit = onEdit,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -158,6 +159,7 @@ private fun DetailContent(
     onFinish: () -> Unit,
     onSaveNotes: (String) -> Unit,
     onUseForSuggestions: (Boolean) -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -192,6 +194,11 @@ private fun DetailContent(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
+        } else {
+            // Typed in by hand after a failed scan: the edit screen can find the rest by title.
+            TextButton(onClick = onEdit, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(stringResource(R.string.add_missing_details), textAlign = TextAlign.Center)
+            }
         }
 
         Spacer(Modifier.height(12.dp))

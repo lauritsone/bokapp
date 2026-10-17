@@ -80,7 +80,7 @@
     <string name="add_title_hint">Legg inn en tittel for å lagre boken.</string>
     <string name="msg_invalid_isbn">Det ISBN-nummeret stemmer ikke. Se etter 10 eller 13 sifre ved strekkoden.</string>
     <string name="msg_offline">Får ikke kontakt med bokdatabasen. Fyll inn detaljene under, eller prøv å søke igjen senere.</string>
-    <string name="msg_not_found">ISBN %1$s finnes ikke i nettkatalogene ennå. Legg inn tittel og forfatter under.</string>
+    <string name="msg_not_found">ISBN %1$s finnes ikke i nettkatalogene ennå. Skriv tittelen og finn den i katalogen, eller fyll inn detaljene selv.</string>
     <string name="already_logged_title">Denne har du allerede logget</string>
     <string name="already_logged_body">Boken ligger allerede i biblioteket ditt. Åpne den for å endre karakteren eller skrive mer i notatene.</string>
     <string name="open_book">Åpne boken</string>
@@ -160,7 +160,6 @@
         <item quantity="other">Om %1$s, som %2$d av bøkene dine</item>
     </plurals>
     <string name="reason_series">Med %1$s, som i en bok du har lest</string>
-    <string name="reason_publisher">Fra %1$s, et forlag du leser</string>
     <string name="add_to_want">Legg i Vil lese</string>
     <string name="added_to_want">Lagt i Vil lese</string>
 
@@ -206,4 +205,11 @@
         <item quantity="one">%1$d bok er holdt utenfor forslagene.</item>
         <item quantity="other">%1$d bøker er holdt utenfor forslagene.</item>
     </plurals>
+    <string name="find_in_catalogue">Finn tittelen i katalogen</string>
+    <string name="pick_edition">Velg din utgave</string>
+    <string name="close">Lukk</string>
+    <string name="use_this_book">Bruk den boken</string>
+    <string name="msg_isbn_mismatch">ISBN %1$s hører til «%2$s» av %3$s, ikke tittelen du skrev. Sjekk nummeret, eller finn boken på tittel i stedet.</string>
+    <string name="msg_no_title_matches">Fant ingen bok med den tittelen i katalogene. Sjekk stavemåten, eller fyll inn detaljene selv.</string>
+    <string name="add_missing_details">Legg til forfatter og andre manglende detaljer</string>
 </resources>

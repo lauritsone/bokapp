@@ -9,7 +9,7 @@ object Genres {
     const val NONFICTION = "nonfiction"
 
     /** When the tagging rules last changed; books tagged before this are tagged again. */
-    const val RULES_SINCE = 1_792_152_000_000L // 2026-10-16 12:00 UTC
+    const val RULES_SINCE = 1_792_238_400_000L // 2026-10-17 12:00 UTC
 
     /** Tag to the word stems (folded) that signal it. A genre may hit several. */
     private val stems = linkedMapOf(

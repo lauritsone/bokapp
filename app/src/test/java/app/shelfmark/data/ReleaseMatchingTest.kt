@@ -143,16 +143,31 @@ class ReleaseMatchingTest {
 
         assertEquals(MatchReason.Author("Jo Nesbø", 5), nesbo.reasons[0])
         assertTrue(nesbo.reasons.any { it is MatchReason.Genre && it.label == "Krim" && it.books == 3 })
-        assertTrue(nesbo.reasons.any { it == MatchReason.Publisher("Aschehoug") })
         assertTrue(cookbook.reasons.isEmpty())
     }
 
-    @Test fun englishEditionsAreNotPenalisedForUnknownPublishers() {
+    @Test fun publisherPlaysNoPart() {
         val tags = Genres.tags(listOf("Krim"), true)
-        val norwegian = profile.score(Candidate(record(publisher = "Ukjent Forlag"), "Ny Forfatter", listOf("Krim"), tags, null))
-        val english = profile.score(Candidate(record(publisher = "Penguin").copy(language = "eng"), "New Author", listOf("Crime"), tags, null))
-        assertTrue("eng ${english.percent} nob ${norwegian.percent}", english.percent > norwegian.percent)
-        assertTrue(english.reasons.none { it is MatchReason.Publisher })
+        val usual = profile.score(Candidate(record(publisher = "Aschehoug"), "Ny Forfatter", listOf("Krim"), tags, null))
+        val unknown = profile.score(Candidate(record(publisher = "Ukjent Forlag"), "Ny Forfatter", listOf("Krim"), tags, null))
+        val english = profile.score(Candidate(record(publisher = "Penguin").copy(language = "eng"), "Ny Forfatter", listOf("Crime"), tags, null))
+        assertEquals(usual.percent, unknown.percent)
+        assertEquals(usual.percent, english.percent)
+    }
+
+    @Test fun onlySubgenresTheUserReadsFit() {
+        fun fits(vararg genres: String, author: String = "Ny Forfatter") =
+            feelgoodReader.fitsGenres(Candidate(record(), author, genres.toList(), Genres.tags(genres.toList(), true), null))
+        assertTrue(fits("Feelgood", "Romaner"))
+        assertTrue("romance is close to feelgood", fits("Kjærlighetsromaner"))
+        assertFalse(fits("Krim", "Romaner"))
+        assertFalse("a plain novel's subgenre is unknown", fits("Romaner"))
+        assertFalse(fits("Kokebøker"))
+        assertTrue("a favourite author's new book always fits", fits("Krim", "Romaner", author = "Jenny Colgan"))
+
+        val plainReader = TasteProfile(listOf(Book(title = "Roman", authors = "A", rating = 5, genres = Genres.encode(setOf("novel", Genres.FICTION)))))
+        assertTrue(plainReader.fitsGenres(Candidate(record(), "B", listOf("Romaner"), Genres.tags(listOf("Romaner"), true), null)))
+        assertTrue("no subgenres yet: the score decides", TasteProfile(emptyList()).fitsGenres(candidate("B", null, listOf("Krim"), true)))
     }
 
     @Test fun readsOpenLibrarySearch() {
@@ -197,9 +212,9 @@ class ReleaseMatchingTest {
         assertTrue("$plain > $crime", plain > crime)
     }
 
-    @Test fun picksAuthorsAndPublishersToSearch() {
+    @Test fun picksAuthorsAndGenresToSearch() {
         assertEquals("Jo Nesbø", profile.favouriteAuthors(3).first())
         assertFalse("Hellstrøm" in profile.favouriteAuthors(10))
-        assertEquals(listOf("Aschehoug", "Cappelen Damm"), profile.favouritePublishers(3))
+        assertEquals("crime", profile.topGenres(3).first())
     }
 }
