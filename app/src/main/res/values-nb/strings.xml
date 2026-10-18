@@ -142,17 +142,22 @@
 
     <!-- New releases -->
     <string name="releases_title">Nye bøker for deg</string>
-    <string name="releases_entry_subtitle">Nye norske og engelske bøker etter din smak, med treffprosent</string>
+    <string name="releases_entry_subtitle">Nye og eldre norske og engelske bøker etter din smak, med treffprosent</string>
     <plurals name="releases_learning">
         <item quantity="one">Blir kjent med smaken din … %1$d av %2$d bok</item>
         <item quantity="other">Blir kjent med smaken din … %1$d av %2$d bøker</item>
     </plurals>
     <string name="releases_searching">Leter etter nye bøker …</string>
-    <string name="releases_reading">Leser om nye bøker … %1$d av %2$d</string>
+    <string name="releases_reading">Leser om bøkene … %1$d av %2$d</string>
     <string name="releases_offline">Fikk ikke kontakt med katalogene. Sjekk nettforbindelsen og prøv igjen.</string>
     <string name="releases_empty">Fant ingen nye bøker akkurat nå. Prøv igjen senere.</string>
     <string name="releases_few_books">Vurder noen flere bøker for mer treffsikre forslag.</string>
     <string name="releases_source">Nye norske bøker fra Nasjonalbibliotekets katalog (nb.no) og nye engelske bøker fra Open Library, sammenlignet med biblioteket ditt.</string>
+    <string name="releases_source_older">Eldre bøker av favorittforfatterne dine, norske bøker i sjangrene dine fra de siste årene og de mest leste engelske bøkene i dem, fra Nasjonalbibliotekets katalog (nb.no) og Open Library, sammenlignet med biblioteket ditt.</string>
+    <string name="kind_new">Nye utgivelser</string>
+    <string name="kind_older">Eldre bøker</string>
+    <string name="releases_searching_older">Leter etter eldre bøker …</string>
+    <string name="releases_empty_older">Fant ingen eldre bøker akkurat nå. Prøv igjen senere.</string>
     <string name="refresh">Oppdater</string>
     <string name="try_again">Prøv igjen</string>
     <string name="match_percent">%1$d %% treff</string>

@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.BookRepository
 import app.shelfmark.data.Match
+import app.shelfmark.data.ReleaseKind
 import app.shelfmark.data.ReleaseProgress
 import app.shelfmark.data.ReleaseResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,21 +23,42 @@ sealed interface ReleasesState {
 
 class ReleasesViewModel(private val repo: BookRepository) : ViewModel() {
 
-    private val _state = MutableStateFlow<ReleasesState>(
-        repo.lastReleases?.let { ReleasesState.Loaded(it, repo.addedReleases.toSet()) } ?: ReleasesState.Loading(),
-    )
+    private val _kind = MutableStateFlow(ReleaseKind.New)
+
+    /** New books or older ones; each kind is searched (and kept) on its own. */
+    val kind: StateFlow<ReleaseKind> = _kind.asStateFlow()
+
+    private val _state = MutableStateFlow(cachedOrLoading(ReleaseKind.New))
     val state: StateFlow<ReleasesState> = _state.asStateFlow()
+    private var search: Job? = null
 
     init {
-        if (repo.lastReleases == null) refresh()
+        if (repo.lastReleases(ReleaseKind.New) == null) refresh()
+    }
+
+    private fun cachedOrLoading(kind: ReleaseKind): ReleasesState =
+        repo.lastReleases(kind)?.let { ReleasesState.Loaded(it, repo.addedReleases.toSet()) } ?: ReleasesState.Loading()
+
+    fun setKind(kind: ReleaseKind) {
+        if (kind == _kind.value) return
+        _kind.value = kind
+        // A search still running for the other kind is no longer wanted.
+        search?.cancel()
+        _state.value = cachedOrLoading(kind)
+        if (_state.value is ReleasesState.Loading) refresh()
     }
 
     fun refresh() {
+        val kind = _kind.value
+        search?.cancel()
         _state.value = ReleasesState.Loading()
-        viewModelScope.launch {
+        search = viewModelScope.launch {
             _state.value = try {
                 ReleasesState.Loaded(
-                    repo.findReleases { p -> _state.update { if (it is ReleasesState.Loading) ReleasesState.Loading(p) else it } },
+                    repo.findReleases(kind) { p ->
+                        // A search for the other kind may still report in as it stops.
+                        if (_kind.value == kind) _state.update { if (it is ReleasesState.Loading) ReleasesState.Loading(p) else it }
+                    },
                     repo.addedReleases.toSet(),
                 )
             } catch (e: IOException) {

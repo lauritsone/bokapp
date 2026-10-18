@@ -97,13 +97,17 @@ class BookRepository(
         }
     }
 
-    /** The last search, kept while the app runs so revisiting the page is instant. */
-    @Volatile var lastReleases: ReleaseResult? = null
-        private set
+    /** The last search of each kind, kept while the app runs so revisiting the page is instant. */
+    private val releases = java.util.concurrent.ConcurrentHashMap<ReleaseKind, ReleaseResult>()
 
-    /** New books scored against the user's taste. @throws java.io.IOException when offline. */
-    suspend fun findReleases(onProgress: (ReleaseProgress) -> Unit): ReleaseResult =
-        withContext(Dispatchers.IO) { releaseFinder.find(onProgress) }.also { lastReleases = it }
+    fun lastReleases(kind: ReleaseKind): ReleaseResult? = releases[kind]
+
+    /** The library changed in a way that changes the suggestions; the next visit searches again. */
+    private fun forgetReleases() = releases.clear()
+
+    /** Books scored against the user's taste. @throws java.io.IOException when offline. */
+    suspend fun findReleases(kind: ReleaseKind, onProgress: (ReleaseProgress) -> Unit): ReleaseResult =
+        withContext(Dispatchers.IO) { releaseFinder.find(kind, onProgress) }.also { releases[kind] = it }
 
     /** Suggestions already put on Want to read, so they still show as added on a later visit. */
     val addedReleases: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
@@ -120,7 +124,7 @@ class BookRepository(
         val existing = c.record.isbn?.let { dao.findByIsbn(it) }?.id
             ?: dao.names().firstOrNull { foldText(it.title) + "|" + foldText(it.authors) == key }?.id
         if (existing != null) return existing
-        val kept = lastReleases
+        val kept = HashMap(releases)
         val id = save(
             Book(
                 title = c.record.title,
@@ -138,7 +142,7 @@ class BookRepository(
             ),
         )
         // The added suggestion shows as added; the rest of the list still holds.
-        lastReleases = kept
+        releases.putAll(kept)
         id
     }
 
@@ -236,7 +240,7 @@ class BookRepository(
         // A blurb or author to go by changes the genres, so they are learned again; one write,
         // so the library redraws once.
         save(updated.copy(coverCheckedAt = if (retryCover) 0 else updated.coverCheckedAt), relearn = true)
-        lastReleases = null
+        forgetReleases()
         RefreshResult.Updated(filled)
     }
 
@@ -335,14 +339,14 @@ class BookRepository(
         // A replaced cover photo is no longer needed.
         previous?.photoPath?.takeIf { it != book.photoPath }?.let { withContext(Dispatchers.IO) { File(it).delete() } }
         // New, changed or moved books change what's suggested (and an owned book isn't new to the user).
-        if (previous == null || identityChanged || previous.shelf != book.shelf || previous.rating != book.rating) lastReleases = null
+        if (previous == null || identityChanged || previous.shelf != book.shelf || previous.rating != book.rating) forgetReleases()
         if (merged.photoPath == null && (merged.coverUrl == null || CoverFinder.isGuess(merged.coverUrl))) repairCovers()
         return if (book.id == 0L) rowId else book.id
     }
 
     suspend fun setRating(id: Long, rating: Int) {
         dao.setRating(id, rating.coerceIn(0, 5), System.currentTimeMillis())
-        lastReleases = null
+        forgetReleases()
     }
 
     suspend fun setNotes(id: Long, notes: String) =
@@ -350,14 +354,14 @@ class BookRepository(
 
     suspend fun setShelf(id: Long, shelf: Shelf) {
         dao.setShelf(id, shelf, System.currentTimeMillis())
-        lastReleases = null
+        forgetReleases()
     }
 
     /** Leaves the book out of (or back in) the taste behind new-release suggestions. */
     suspend fun setIgnoreForSuggestions(id: Long, ignore: Boolean) {
         dao.setIgnoreForSuggestions(id, ignore, System.currentTimeMillis())
         // The scores change, so the next visit to the new-releases page searches again.
-        lastReleases = null
+        forgetReleases()
     }
 
     /** Moves the book to Read and records today as the day it was finished. */
@@ -365,7 +369,7 @@ class BookRepository(
 
     suspend fun review(id: Long, rating: Int, notes: String) {
         dao.setReview(id, rating.coerceIn(0, 5), notes.trim(), System.currentTimeMillis())
-        lastReleases = null
+        forgetReleases()
     }
 
     /** The page the user is on; past the last page counts as the last. */
@@ -389,7 +393,7 @@ class BookRepository(
     /** Starts the book again: back on Reading, counted as a re-read, rating and notes kept. */
     suspend fun readAgain(id: Long) {
         dao.readAgain(id, System.currentTimeMillis())
-        lastReleases = null
+        forgetReleases()
     }
 
     /**
@@ -543,7 +547,7 @@ class BookRepository(
         }
         if (fresh.isNotEmpty() || updates.isNotEmpty()) {
             repairCovers()
-            lastReleases = null
+            forgetReleases()
         }
         ImportResult(added = fresh.size, updated = updates.size, skipped = total - fresh.size - updates.size)
     }
@@ -559,7 +563,7 @@ class BookRepository(
      */
     suspend fun delete(book: Book) {
         dao.delete(book)
-        lastReleases = null
+        forgetReleases()
         lastRemoved.value = book
     }
 
@@ -571,7 +575,7 @@ class BookRepository(
     /** Brings a removed book back, as it was. */
     suspend fun restore(book: Book) {
         dao.upsert(book)
-        lastReleases = null
+        forgetReleases()
         repairCovers()
     }
 
@@ -581,7 +585,7 @@ class BookRepository(
             before.id, before.shelf, before.rating, before.notes, before.startedAt, before.finishedAt,
             before.currentPage, before.rereads, before.lentTo, before.lentAt, System.currentTimeMillis(),
         )
-        lastReleases = null
+        forgetReleases()
     }
 
     /**

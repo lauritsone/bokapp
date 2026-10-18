@@ -19,11 +19,14 @@ sealed interface ReleaseProgress {
     data class ReadingDetails(val done: Int, val total: Int) : ReleaseProgress
 }
 
+/** Which books to suggest: from this year and last, or from before. */
+enum class ReleaseKind { New, Older }
+
 /** [ignored] is how many books the user left out of the taste profile. */
 data class ReleaseResult(val matches: List<Match>, val profileSize: Int, val ignored: Int = 0)
 
 /**
- * Finds new books: Norwegian ones in the National Library's catalogue (recent books by
+ * Finds books to suggest ([ReleaseKind.Older] does the same with older books). New books: Norwegian ones in the National Library's catalogue (recent books by
  * the user's favourite authors, and every book of this year and last in the subgenres
  * they read) and English ones on Open Library (new books by those authors, and the
  * most-read new books in their genres). Each is scored against a [TasteProfile] of
@@ -40,7 +43,7 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
     private val firstYearsCache = ConcurrentHashMap<String, Map<String, Int>>()
 
     /** @throws IOException if the catalogue can't be reached at all. */
-    suspend fun find(onProgress: (ReleaseProgress) -> Unit): ReleaseResult {
+    suspend fun find(kind: ReleaseKind, onProgress: (ReleaseProgress) -> Unit): ReleaseResult {
         nb.pruneCache()
         learnGenres(onProgress)
         val library = dao.getAll()
@@ -49,41 +52,9 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
 
         onProgress(ReleaseProgress.Searching)
         val failures = AtomicInteger()
-        val searches = mutableListOf<suspend () -> List<CatalogRecord>>()
-        for (author in profile.favouriteAuthors(limit = 8)) {
-            for (y in listOf(year, year - 1)) {
-                searches += { nb.search("\"$author\"", year = y, size = 20).filter { wroteBy(it, author) } }
-            }
-        }
-        // Every new Norwegian book in the subgenres the user reads (feelgood, crime …), whoever
-        // published it. NB.no files them under its own genre words, a page at a time.
-        val genres = profile.topGenres(limit = 6)
-        val nbGenres = genres.mapNotNull { nbSubjects[it] }
-            .ifEmpty { if (profile.bookCount > 0) listOf("romaner") else emptyList() }
-        for (subject in nbGenres) {
-            for (y in listOf(year, year - 1)) {
-                searches += {
-                    buildList {
-                        var page = 0
-                        do {
-                            val batch = nb.search("subject:\"$subject\"", year = y, size = 100, page = page++)
-                            addAll(batch)
-                        } while (batch.size == 100 && page < GENRE_PAGES)
-                    }
-                }
-            }
-        }
-        // English: the same authors' new books, and the most-read new books in the user's genres.
-        for (author in profile.favouriteAuthors(limit = 6)) {
-            searches += { ol.search("author:\"$author\"", fromYear = year - 1, limit = 5).filter { wroteBy(it, author) } }
-        }
-        val subjects = genres.take(3).mapNotNull { olSubjects[it] }.ifEmpty { listOf("fiction") }
-        for (subject in subjects) {
-            searches += { ol.search("subject:\"$subject\"", fromYear = year - 1, limit = 12, popular = true) }
-        }
-        if (profile.bookCount == 0) {
-            // Nothing to go on yet: show this year's newest Norwegian books too.
-            searches += { nb.search("*", year = year, size = 60).newest(25) }
+        val searches = when (kind) {
+            ReleaseKind.New -> newSearches(profile, year)
+            ReleaseKind.Older -> olderSearches(profile, year)
         }
         val found = concurrently(searches) { search ->
             try {
@@ -156,15 +127,94 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
         val scored = candidates.filter(profile::fitsGenres).map(profile::score).sortedByDescending { it.percent }
         // Checking takes a request per author, so only the books that may be shown are checked.
         val shortlist = scored.filter { it.percent >= MIN_PERCENT }.takeIf { it.size >= 10 } ?: scored.take(20)
-        // One bibliography request per author, however many of their books are on the list.
-        val firstYearsBy = concurrently(shortlist.mapNotNull { firstAuthor(it.candidate) }.distinct()) { author ->
-            author to cachedFirstYears(author)
-        }.toMap()
-        val matches = shortlist.filterNot { isReissue(it.candidate, year, firstYearsBy) }
+        val matches = if (kind == ReleaseKind.New) {
+            // One bibliography request per author, however many of their books are on the list.
+            val firstYearsBy = concurrently(shortlist.mapNotNull { firstAuthor(it.candidate) }.distinct()) { author ->
+                author to cachedFirstYears(author)
+            }.toMap()
+            shortlist.filterNot { isReissue(it.candidate, year, firstYearsBy) }
+        } else {
+            // Older books are meant to be older; a new edition of one is still that book.
+            shortlist
+        }
             // Poor matches only clutter the list, but a thin library should still see something.
             .let { all -> all.filter { it.percent >= MIN_PERCENT }.takeIf { it.size >= 10 } ?: all.take(10) }
         return ReleaseResult(matches, profile.bookCount, library.count { it.ignoreForSuggestions })
     }
+
+    /**
+     * Searches for books from this year and last: the favourite authors' new books and every
+     * new Norwegian book in the subgenres the user reads, and the same in English.
+     */
+    private fun newSearches(profile: TasteProfile, year: Int): List<suspend () -> List<CatalogRecord>> {
+        val searches = mutableListOf<suspend () -> List<CatalogRecord>>()
+        for (author in profile.favouriteAuthors(limit = 8)) {
+            for (y in listOf(year, year - 1)) {
+                searches += { nb.search("\"$author\"", year = y, size = 20).filter { wroteBy(it, author) } }
+            }
+        }
+        // Every new Norwegian book in the subgenres the user reads (feelgood, crime …), whoever
+        // published it. NB.no files them under its own genre words, a page at a time.
+        for (subject in nbGenres(profile)) {
+            for (y in listOf(year, year - 1)) {
+                searches += {
+                    buildList {
+                        var page = 0
+                        do {
+                            val batch = nb.search("subject:\"$subject\"", year = y, size = 100, page = page++)
+                            addAll(batch)
+                        } while (batch.size == 100 && page < GENRE_PAGES)
+                    }
+                }
+            }
+        }
+        // English: the same authors' new books, and the most-read new books in the user's genres.
+        for (author in profile.favouriteAuthors(limit = 6)) {
+            searches += { ol.search("author:\"$author\"", fromYear = year - 1, limit = 5).filter { wroteBy(it, author) } }
+        }
+        for (subject in olSubjects(profile)) {
+            searches += { ol.search("subject:\"$subject\"", fromYear = year - 1, limit = 12, popular = true) }
+        }
+        if (profile.bookCount == 0) {
+            // Nothing to go on yet: show this year's newest Norwegian books too.
+            searches += { nb.search("*", year = year, size = 60).newest(25) }
+        }
+        return searches
+    }
+
+    /**
+     * Searches for books from before last year: everything else the favourite authors have
+     * written, Norwegian books in the user's subgenres from the years before, and the most-read
+     * English books in their genres. These answers hardly change, so they may come from the cache.
+     */
+    private fun olderSearches(profile: TasteProfile, year: Int): List<suspend () -> List<CatalogRecord>> {
+        fun older(r: CatalogRecord) = r.year != null && r.year < year - 1
+        val searches = mutableListOf<suspend () -> List<CatalogRecord>>()
+        for (author in profile.favouriteAuthors(limit = 8)) {
+            searches += { nb.search("\"$author\"", size = 100, cached = true).filter { wroteBy(it, author) && older(it) } }
+        }
+        for (author in profile.favouriteAuthors(limit = 6)) {
+            searches += { ol.search("author:\"$author\"", fromYear = 0, limit = 20).filter { wroteBy(it, author) && older(it) } }
+        }
+        for (subject in nbGenres(profile)) {
+            for (y in (year - 2) downTo (year - OLDER_YEARS)) {
+                searches += { nb.search("subject:\"$subject\"", year = y, size = 100, cached = true) }
+            }
+        }
+        for (subject in olSubjects(profile)) {
+            searches += { ol.search("subject:\"$subject\"", fromYear = 0, limit = 30, popular = true).filter(::older) }
+        }
+        return searches
+    }
+
+    /** NB.no's genre words for the subgenres the user reads. */
+    private fun nbGenres(profile: TasteProfile): List<String> =
+        profile.topGenres(limit = 6).mapNotNull { nbSubjects[it] }
+            .ifEmpty { if (profile.bookCount > 0) listOf("romaner") else emptyList() }
+
+    /** Open Library's subjects for the user's three main genres. */
+    private fun olSubjects(profile: TasteProfile): List<String> =
+        profile.topGenres(limit = 3).mapNotNull { olSubjects[it] }.ifEmpty { listOf("fiction") }
 
     /** Looks up genres for library books that don't have them yet, a batch at a time. */
     private suspend fun learnGenres(onProgress: (ReleaseProgress) -> Unit) {
@@ -286,6 +336,9 @@ class ReleaseFinder(private val dao: BookDao, private val nb: NbCatalog, private
     companion object {
         /** Matches below this are left out, as long as enough better ones remain. */
         const val MIN_PERCENT = 30
+
+        /** How many years back the search for older Norwegian books in the user's genres reaches. */
+        private const val OLDER_YEARS = 6
 
         /** Pages of 100 to read per subgenre and year; more than most genres publish in a year. */
         private const val GENRE_PAGES = 4

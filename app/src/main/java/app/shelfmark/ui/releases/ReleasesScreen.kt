@@ -61,6 +61,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.shelfmark.R
 import app.shelfmark.data.Match
 import app.shelfmark.data.MatchReason
+import app.shelfmark.data.ReleaseKind
 import app.shelfmark.data.ReleaseProgress
 import app.shelfmark.data.Shelf
 import app.shelfmark.ui.components.BarSpinner
@@ -76,6 +77,9 @@ import app.shelfmark.ui.theme.LocalExtendedColors
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -99,6 +103,7 @@ fun ReleasesScreen(onBack: () -> Unit, onOpenBook: (Long) -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     val resources = LocalResources.current
     val justAdded by vm.justAdded.collectAsStateWithLifecycle()
+    val kind by vm.kind.collectAsStateWithLifecycle()
     LaunchedEffect(justAdded) {
         val id = justAdded ?: return@LaunchedEffect
         val choice = snackbar.showSnackbar(
@@ -128,17 +133,35 @@ fun ReleasesScreen(onBack: () -> Unit, onOpenBook: (Long) -> Unit) {
             )
         },
     ) { padding ->
-        when (val s = state) {
-            is ReleasesState.Loading -> LoadingState(Modifier.padding(padding), text = progressText(s.progress))
-            ReleasesState.Offline -> EmptyState(
-                title = null,
-                body = stringResource(R.string.releases_offline),
-                icon = Icons.Rounded.CloudOff,
-                modifier = Modifier.padding(padding).padding(horizontal = Dimens.gutter),
-            ) {
-                Button(onClick = vm::refresh) { Text(stringResource(R.string.try_again)) }
+        val layoutDirection = LocalLayoutDirection.current
+        // The switch sits under the bar; the rest uses the padding on the other sides.
+        val below = PaddingValues(
+            start = padding.calculateStartPadding(layoutDirection),
+            end = padding.calculateEndPadding(layoutDirection),
+            bottom = padding.calculateBottomPadding(),
+        )
+        Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+            KindSwitch(
+                kind,
+                onChange = vm::setKind,
+                modifier = Modifier
+                    .padding(start = below.calculateStartPadding(layoutDirection), end = below.calculateEndPadding(layoutDirection))
+                    .padding(horizontal = Dimens.gutter, vertical = Dimens.topGap),
+            )
+            Box(Modifier.weight(1f)) {
+                when (val s = state) {
+                    is ReleasesState.Loading -> LoadingState(Modifier.padding(below), text = progressText(kind, s.progress))
+                    ReleasesState.Offline -> EmptyState(
+                        title = null,
+                        body = stringResource(R.string.releases_offline),
+                        icon = Icons.Rounded.CloudOff,
+                        modifier = Modifier.padding(below).padding(horizontal = Dimens.gutter),
+                    ) {
+                        Button(onClick = vm::refresh) { Text(stringResource(R.string.try_again)) }
+                    }
+                    is ReleasesState.Loaded -> ReleaseList(s, kind, below, onOpen = { open = it }, onRefresh = vm::refresh)
+                }
             }
-            is ReleasesState.Loaded -> ReleaseList(s, padding, onOpen = { open = it }, onRefresh = vm::refresh)
         }
     }
 
@@ -160,10 +183,27 @@ fun ReleasesScreen(onBack: () -> Unit, onOpenBook: (Long) -> Unit) {
 }
 
 @Composable
-private fun progressText(progress: ReleaseProgress?): String = when (progress) {
+private fun progressText(kind: ReleaseKind, progress: ReleaseProgress?): String = when (progress) {
     is ReleaseProgress.LearningTaste -> pluralStringResource(R.plurals.releases_learning, progress.total, progress.done, progress.total)
     is ReleaseProgress.ReadingDetails -> stringResource(R.string.releases_reading, progress.done, progress.total)
-    else -> stringResource(R.string.releases_searching)
+    else -> stringResource(if (kind == ReleaseKind.Older) R.string.releases_searching_older else R.string.releases_searching)
+}
+
+/** New releases or older books, side by side under the bar. */
+@Composable
+private fun KindSwitch(kind: ReleaseKind, onChange: (ReleaseKind) -> Unit, modifier: Modifier = Modifier) {
+    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
+        ReleaseKind.entries.forEachIndexed { index, k ->
+            SegmentedButton(
+                selected = k == kind,
+                onClick = { onChange(k) },
+                shape = SegmentedButtonDefaults.itemShape(index, ReleaseKind.entries.size),
+                label = {
+                    Text(stringResource(if (k == ReleaseKind.New) R.string.kind_new else R.string.kind_older))
+                },
+            )
+        }
+    }
 }
 
 /** Which languages to show; English books come from Open Library, Norwegian from NB.no. */
@@ -174,7 +214,13 @@ private enum class LanguageFilter(@StringRes val label: Int, val language: Strin
 }
 
 @Composable
-private fun ReleaseList(state: ReleasesState.Loaded, padding: PaddingValues, onOpen: (Match) -> Unit, onRefresh: () -> Unit) {
+private fun ReleaseList(
+    state: ReleasesState.Loaded,
+    kind: ReleaseKind,
+    padding: PaddingValues,
+    onOpen: (Match) -> Unit,
+    onRefresh: () -> Unit,
+) {
     var filter by rememberSaveable { mutableStateOf(LanguageFilter.All) }
     val shown = state.result.matches.filter { filter.language == null || it.candidate.record.language == filter.language }
     val layoutDirection = LocalLayoutDirection.current
@@ -184,14 +230,14 @@ private fun ReleaseList(state: ReleasesState.Loaded, padding: PaddingValues, onO
         contentPadding = PaddingValues(
             start = padding.calculateStartPadding(layoutDirection) + Dimens.gutter,
             end = padding.calculateEndPadding(layoutDirection) + Dimens.gutter,
-            top = padding.calculateTopPadding() + Dimens.topGap,
+            top = padding.calculateTopPadding(),
             bottom = padding.calculateBottomPadding() + Dimens.bottomGap,
         ),
     ) {
         item(key = "intro") {
             Column(Modifier.padding(bottom = 8.dp)) {
                 Text(
-                    stringResource(R.string.releases_source),
+                    stringResource(if (kind == ReleaseKind.Older) R.string.releases_source_older else R.string.releases_source),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -225,7 +271,7 @@ private fun ReleaseList(state: ReleasesState.Loaded, padding: PaddingValues, onO
         }
         if (shown.isEmpty()) {
             item(key = "empty") {
-                EmptyState(title = null, body = stringResource(R.string.releases_empty), icon = Icons.Rounded.AutoAwesome) {
+                EmptyState(title = null, body = stringResource(if (kind == ReleaseKind.Older) R.string.releases_empty_older else R.string.releases_empty), icon = Icons.Rounded.AutoAwesome) {
                     // Books may be waiting in the other language; otherwise, a new search.
                     if (filter != LanguageFilter.All && state.result.matches.isNotEmpty()) {
                         TextButton(onClick = { filter = LanguageFilter.All }) { Text(stringResource(R.string.show_all_languages)) }

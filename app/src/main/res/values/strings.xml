@@ -147,17 +147,22 @@
 
     <!-- New releases -->
     <string name="releases_title">New releases for you</string>
-    <string name="releases_entry_subtitle">New Norwegian and English books picked for your taste, with a match score</string>
+    <string name="releases_entry_subtitle">New and older Norwegian and English books picked for your taste, with a match score</string>
     <plurals name="releases_learning">
         <item quantity="one">Learning your taste… %1$d of %2$d book</item>
         <item quantity="other">Learning your taste… %1$d of %2$d books</item>
     </plurals>
     <string name="releases_searching">Looking for new books…</string>
-    <string name="releases_reading">Reading about new books… %1$d of %2$d</string>
+    <string name="releases_reading">Reading about the books… %1$d of %2$d</string>
     <string name="releases_offline">Couldn’t reach the catalogues. Check your connection and try again.</string>
     <string name="releases_empty">No new books found right now. Try again later.</string>
     <string name="releases_few_books">Rate a few more books for sharper matches.</string>
     <string name="releases_source">New Norwegian books from the National Library’s catalogue (nb.no) and new English books from Open Library, scored against your library.</string>
+    <string name="releases_source_older">Earlier books by your favourite authors, Norwegian books in your genres from recent years and the most-read English books in them, from the National Library’s catalogue (nb.no) and Open Library, scored against your library.</string>
+    <string name="kind_new">New releases</string>
+    <string name="kind_older">Older books</string>
+    <string name="releases_searching_older">Looking for older books…</string>
+    <string name="releases_empty_older">No older books found right now. Try again later.</string>
     <string name="refresh">Refresh</string>
     <string name="try_again">Try again</string>
     <string name="match_percent">%1$d%% match</string>
