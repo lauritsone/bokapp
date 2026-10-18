@@ -24,6 +24,8 @@ data class CatalogRecord(
     val subjects: List<String> = emptyList(),
     /** Whether the catalogue already knows this is the first printing (Open Library's first publish year). */
     val knownFirstEdition: Boolean = false,
+    /** Every ISBN of the record (hardback, paperback, ebook …); [isbn] is the first. */
+    val isbns: List<String> = listOfNotNull(isbn),
 )
 
 /** The parts of a full catalogue record (MODS) that say what kind of book it is. */
@@ -80,7 +82,7 @@ class NbCatalog(private val cache: DiskCache? = null) {
         }
 
     suspend fun findByIsbn(isbn: String, cached: Boolean = false): CatalogRecord? =
-        search("isbn:$isbn", size = 5, norwegianOnly = false, cached = cached).firstOrNull { it.isbn == isbn }
+        search("isbn:$isbn", size = 5, norwegianOnly = false, cached = cached).firstOrNull { isbn in it.isbns }
 
     suspend fun details(id: String, cached: Boolean = false): NbDetails = withContext(Dispatchers.IO) {
         fetch("$BASE/metadata/$id/mods", cached, ::parseMods)
@@ -114,6 +116,9 @@ class NbCatalog(private val cache: DiskCache? = null) {
                 val m = item.optJSONObject("metadata") ?: return@mapNotNull null
                 val title = m.optString("title").trim().ifEmpty { null } ?: return@mapNotNull null
                 val origin = m.optJSONObject("originInfo")
+                val isbns = m.optJSONObject("identifiers")?.optJSONArray("isbn13")
+                    ?.let { a -> (0 until a.length()).map { a.optString(it).trim() }.filter { it.isNotEmpty() } }
+                    .orEmpty()
                 val creators = m.optJSONArray("creators")
                     ?.let { a -> (0 until a.length()).map { a.optString(it).trim() }.filter { it.isNotEmpty() } }
                     .orEmpty()
@@ -123,7 +128,8 @@ class NbCatalog(private val cache: DiskCache? = null) {
                     creators = creators,
                     publisher = origin?.optString("publisher")?.trim()?.ifEmpty { null },
                     year = origin?.optString("issued")?.take(4)?.toIntOrNull(),
-                    isbn = m.optJSONObject("identifiers")?.optJSONArray("isbn13")?.optString(0)?.ifEmpty { null },
+                    isbn = isbns.firstOrNull(),
+                    isbns = isbns,
                     pageCount = m.optInt("pageCount").takeIf { it > 0 },
                     coverUrl = item.optJSONObject("_links")?.optJSONObject("thumbnail_large")?.optString("href")?.ifEmpty { null },
                     indexedAt = origin?.optString("firstIndexTime")

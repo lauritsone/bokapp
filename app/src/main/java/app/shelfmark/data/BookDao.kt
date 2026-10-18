@@ -38,10 +38,6 @@ interface BookDao {
     )
     suspend fun uncheckedCovers(): List<Book>
 
-    /** The books of a series, in any spelling of its name's case. */
-    @Query("SELECT * FROM books WHERE series = :series COLLATE NOCASE")
-    fun observeSeries(series: String): Flow<List<Book>>
-
     /** Books in the taste profile whose genres were learned before [since] (or never). */
     @Query("SELECT * FROM books WHERE ignoreForSuggestions = 0 AND profiledAt < :since LIMIT :limit")
     suspend fun unprofiled(since: Long, limit: Int): List<Book>

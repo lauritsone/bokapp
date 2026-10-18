@@ -11,7 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -168,9 +167,13 @@ fun BookDetailScreen(
             is DetailChange.Returned -> resources.getString(R.string.marked_returned)
             is DetailChange.DateCleared -> resources.getString(R.string.date_cleared)
         }
-        val choice = snackbar.showSnackbar(message, actionLabel = resources.getString(R.string.undo), duration = SnackbarDuration.Short)
-        vm.changeShown()
-        if (choice == SnackbarResult.ActionPerformed) vm.undo(c)
+        // Cleared however it ends: leaving for the edit screen mustn't bring an old Undo back later.
+        try {
+            val choice = snackbar.showSnackbar(message, actionLabel = resources.getString(R.string.undo), duration = SnackbarDuration.Short)
+            if (choice == SnackbarResult.ActionPerformed) vm.undo(c)
+        } finally {
+            vm.changeShown(c)
+        }
     }
 
     // Notes being written are saved on the way out rather than lost.
@@ -328,7 +331,6 @@ private fun DetailContent(
     Column(
         Modifier
             .fillMaxSize()
-            .consumeWindowInsets(contentPadding)
             .imePadding()
             .verticalScroll(scroll)
             // Inside the scroll, so the page scrolls under the top bar and the navigation bar.

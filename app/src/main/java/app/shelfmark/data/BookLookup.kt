@@ -8,6 +8,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONArray
 import org.json.JSONException
@@ -65,7 +66,9 @@ class BookLookup(private val nb: NbCatalog) {
             val first = google.await() ?: openLibrary.await()
             // Google answered: Open Library's copy isn't needed.
             openLibrary.cancel()
-            val fromNb = norway.await()
+            // With a book in hand, NB.no only adds the series and a blurb: not worth a long wait.
+            val fromNb = if (first == null) norway.await() else withTimeoutOrNull(NB_EXTRA_WAIT_MS) { norway.await() }
+            norway.cancel()
             when {
                 first != null -> first.copy(
                     series = first.series ?: fromNb?.series,
@@ -132,7 +135,8 @@ class BookLookup(private val nb: NbCatalog) {
     }
 
     private suspend fun fromNationalLibraryNorway(isbn: String): BookInfo? {
-        val record = nb.findByIsbn(isbn, cached = true) ?: return null
+        // Asked fresh: a book new to NB.no shows up there within days.
+        val record = nb.findByIsbn(isbn) ?: return null
         // The full record names the main author apart from translators, and has the blurb.
         val details = try {
             nb.details(record.id, cached = true)
@@ -183,6 +187,9 @@ class BookLookup(private val nb: NbCatalog) {
 
         /** No new source is tried after this long. */
         const val LOOKUP_BUDGET_MS = 20_000L
+
+        /** How long NB.no is waited for once another source has found the book. */
+        const val NB_EXTRA_WAIT_MS = 3_000L
     }
 
     private fun openLibraryCover(isbn: String) =

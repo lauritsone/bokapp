@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.shelfmark.data.Book
 import app.shelfmark.data.BookRepository
+import app.shelfmark.data.Removed
 import app.shelfmark.data.Shelf
 import app.shelfmark.data.foldText
 import app.shelfmark.data.seriesOrder
@@ -227,10 +228,10 @@ class LibraryViewModel(
     }
 
     /** A book just removed on its page, for the library to offer back. */
-    val removed: StateFlow<Book?> = repo.lastRemoved
+    val removed: StateFlow<Removed?> = repo.lastRemoved
 
-    fun removedShown() {
-        repo.lastRemoved.value = null
+    fun removedShown(shown: Removed) {
+        repo.lastRemoved.compareAndSet(shown, null)
     }
 
     fun restore(book: Book) {

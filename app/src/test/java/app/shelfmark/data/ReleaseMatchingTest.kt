@@ -62,6 +62,15 @@ class ReleaseMatchingTest {
         assertEquals(setOf(Genres.NONFICTION), Genres.tags(listOf("Nonfiction"), null))
     }
 
+    @Test fun keepsEveryIsbnOfASearchResult() {
+        val json = """{"_embedded":{"items":[{"id":"x1","metadata":{"title":"Snømannen",
+            "identifiers":{"isbn13":["9788203193538","9788203367380"]}}}]}}"""
+        val record = NbCatalog.parseSearch(json).single()
+        assertEquals("9788203193538", record.isbn)
+        // A paperback's ISBN, listed second, still finds the record.
+        assertEquals(listOf("9788203193538", "9788203367380"), record.isbns)
+    }
+
     @Test fun cleansCatalogueTitles() {
         assertEquals("Minnesota", ReleaseFinder.displayTitle("Minnesota : roman"))
         assertEquals("Skyggedyr", ReleaseFinder.displayTitle("Skyggedyr : krim"))

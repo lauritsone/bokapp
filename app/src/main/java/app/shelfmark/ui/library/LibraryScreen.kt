@@ -173,17 +173,21 @@ fun LibraryScreen(
 
     val removed by vm.removed.collectAsStateWithLifecycle()
     LaunchedEffect(removed) {
-        val book = removed ?: return@LaunchedEffect
-        try {
-            val choice = snackbar.showSnackbar(
-                resources.getString(R.string.removed_book, book.title),
-                actionLabel = resources.getString(R.string.undo),
-                duration = SnackbarDuration.Long,
-            )
-            if (choice == SnackbarResult.ActionPerformed) vm.restore(book)
-        } finally {
-            vm.removedShown()
+        val r = removed ?: return@LaunchedEffect
+        // Offered only on the way back from removing it, not on some later visit (the book
+        // may have been removed from a page opened from the suggestions).
+        if (System.currentTimeMillis() - r.at > REMOVED_UNDO_MS) {
+            vm.removedShown(r)
+            return@LaunchedEffect
         }
+        val choice = snackbar.showSnackbar(
+            resources.getString(R.string.removed_book, r.book.title),
+            actionLabel = resources.getString(R.string.undo),
+            duration = SnackbarDuration.Long,
+        )
+        // Not cleared when cut short (the screen turning), so it is offered again straight away.
+        vm.removedShown(r)
+        if (choice == SnackbarResult.ActionPerformed) vm.restore(r.book)
     }
 
     Scaffold(
@@ -289,6 +293,9 @@ fun LibraryScreen(
         }
     }
 }
+
+/** How long after a book is removed the library still offers to bring it back. */
+private const val REMOVED_UNDO_MS = 15_000L
 
 @Composable
 private fun LibraryHeader(

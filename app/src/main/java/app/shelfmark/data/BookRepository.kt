@@ -148,7 +148,6 @@ class BookRepository(
 
     fun observe(id: Long): Flow<Book?> = dao.observe(id)
 
-    fun observeSeries(series: String): Flow<List<Book>> = dao.observeSeries(series)
 
     suspend fun get(id: Long): Book? = dao.get(id)
 
@@ -239,7 +238,7 @@ class BookRepository(
         }
         // A blurb or author to go by changes the genres, so they are learned again; one write,
         // so the library redraws once.
-        save(updated.copy(coverCheckedAt = if (retryCover) 0 else updated.coverCheckedAt), relearn = true)
+        save(updated, relearn = true, retryCover = retryCover)
         forgetReleases()
         RefreshResult.Updated(filled)
     }
@@ -291,9 +290,10 @@ class BookRepository(
 
     /**
      * Inserts or updates; returns the book's id. [relearn] looks the genres up again even
-     * when the title and author are unchanged.
+     * when the title and author are unchanged; [retryCover] looks for a cover again if the
+     * book still has none.
      */
-    suspend fun save(book: Book, relearn: Boolean = false): Long {
+    suspend fun save(book: Book, relearn: Boolean = false, retryCover: Boolean = false): Long {
         val now = System.currentTimeMillis()
         val previous = if (book.id == 0L) null else dao.get(book.id)
         val previousShelf = previous?.shelf
@@ -317,13 +317,16 @@ class BookRepository(
         // background since then are kept rather than written back over.
         val merged = when {
             previous == null -> book
-            identityChanged || relearn -> book.copy(genres = null, profiledAt = 0)
+            identityChanged -> book.copy(genres = null, profiledAt = 0)
             else -> book.copy(
                 genres = previous.genres,
                 profiledAt = previous.profiledAt,
                 coverUrl = if (book.coverUrl == null || CoverFinder.isGuess(book.coverUrl)) previous.coverUrl ?: book.coverUrl else book.coverUrl,
                 coverCheckedAt = maxOf(book.coverCheckedAt, previous.coverCheckedAt),
-            )
+            ).let { if (relearn) it.copy(genres = null, profiledAt = 0) else it }
+        }.let { m ->
+            val stillNoCover = m.photoPath == null && (m.coverUrl == null || CoverFinder.isGuess(m.coverUrl))
+            if (retryCover && stillNoCover) m.copy(coverCheckedAt = 0) else m
         }
         val rowId = dao.upsert(
             merged.copy(
@@ -554,8 +557,8 @@ class BookRepository(
 
     private fun nameKey(book: Book) = foldText(book.title) + "|" + foldText(book.authors)
 
-    /** The book removed last, until the library has offered to undo it. */
-    val lastRemoved = MutableStateFlow<Book?>(null)
+    /** The book removed last and when, until the library has offered to undo it. */
+    val lastRemoved = MutableStateFlow<Removed?>(null)
 
     /**
      * Removes the book. Its cover photo stays until the next start, so Undo can bring the
@@ -564,7 +567,7 @@ class BookRepository(
     suspend fun delete(book: Book) {
         dao.delete(book)
         forgetReleases()
-        lastRemoved.value = book
+        lastRemoved.value = Removed(book, System.currentTimeMillis())
     }
 
     /** Runs [deleteUnusedPhotos] in the background. */
@@ -616,6 +619,9 @@ private const val COVER_BATCH = 16
 
 /** The next book in a series: on a shelf already ([owned]), or a catalogue edition to add. */
 data class NextInSeries(val title: String, val owned: Book?, val record: CatalogRecord?)
+
+/** A book just removed, at [at], for Undo. */
+data class Removed(val book: Book, val at: Long)
 
 /** [updated] books were already in the library, and the imported copy was newer. */
 data class ImportResult(val added: Int, val skipped: Int, val updated: Int = 0)

@@ -6,6 +6,7 @@ import app.shelfmark.data.Book
 import app.shelfmark.data.BookRepository
 import app.shelfmark.data.NextInSeries
 import app.shelfmark.data.RefreshResult
+import app.shelfmark.data.foldText
 import app.shelfmark.data.seriesOrder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -42,8 +43,9 @@ class BookDetailViewModel(
     /** A change just made, which the page offers to undo, until it has been shown. */
     val change: StateFlow<DetailChange?> = _change.asStateFlow()
 
-    fun changeShown() {
-        _change.value = null
+    /** [shown] has been offered; a newer change is kept. */
+    fun changeShown(shown: DetailChange) {
+        _change.compareAndSet(shown, null)
     }
 
     /** Puts the reading log back as it was before [change]. */
@@ -135,15 +137,17 @@ class BookDetailViewModel(
     }
 
     /** The other books of this book's series in the library, in series order (this one included). */
-    // Only the series' own books are read, and only again when the series changes.
+    // The library is only read for books in a series, and again only when the series changes.
+    // Names are compared folded, so "Ødegård" and "ødegård", or "Harry-Hole" and "Harry Hole", match.
     @OptIn(ExperimentalCoroutinesApi::class)
-    val seriesBooks: StateFlow<List<Book>> = book.map { it?.series }.distinctUntilChanged()
+    val seriesBooks: StateFlow<List<Book>> = book.map { it?.series?.let(::foldText) }.distinctUntilChanged()
         .flatMapLatest { series ->
             if (series == null) {
                 flowOf(emptyList())
             } else {
-                repo.observeSeries(series).map { books ->
-                    books.sortedWith(compareBy({ it.seriesOrder() }, { it.publishedDate ?: "" }, { it.addedAt }))
+                repo.books.map { all ->
+                    all.filter { it.series?.let(::foldText) == series }
+                        .sortedWith(compareBy({ it.seriesOrder() }, { it.publishedDate ?: "" }, { it.addedAt }))
                 }
             }
         }

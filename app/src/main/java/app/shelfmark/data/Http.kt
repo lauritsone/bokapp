@@ -1,5 +1,6 @@
 package app.shelfmark.data
 
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -30,7 +31,8 @@ internal suspend fun httpGet(url: String, timeoutMs: Int = 10_000): String {
  * cancelled (the user left the screen), rather than holding a thread until the timeout.
  */
 private suspend fun <T> cancellable(conn: HttpURLConnection, block: () -> T): T = coroutineScope {
-    val watcher = launch {
+    // Started at once, so it is in place even if the caller is cancelled straight away.
+    val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
         try {
             awaitCancellation()
         } finally {
@@ -41,6 +43,7 @@ private suspend fun <T> cancellable(conn: HttpURLConnection, block: () -> T): T 
         runInterruptible { block() }
     } finally {
         watcher.cancel()
+        conn.disconnect()
     }
 }
 
